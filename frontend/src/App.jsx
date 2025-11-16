@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router';
 import { AuthProvider, useAuth } from './hooks/useAuth'; // Import Auth Provider and Hook
 import ProtectedRoute from './components/ProtectedRoute'; // Import ProtectedRoute
+import Header from './components/Header';
 
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -27,7 +28,8 @@ function App() {
         <Router>
             {/* Wrap the entire App logic in the AuthProvider */}
             <AuthProvider>
-                <Nav />
+                <Header />
+                <main className="pt-4 pb-10">
                 <Routes>
                     <Route path="/register" element={<Register />} />
                     {/* Login component uses the login function from context */}
@@ -45,6 +47,7 @@ function App() {
                     
                     <Route path="*" element={<HomeRedirect />} />
                 </Routes>
+                </main>
             </AuthProvider>
         </Router>
     );

@@ -5,14 +5,76 @@ import { useAuth } from '../hooks/useAuth';
 
 const VITE_API_URL = import.meta.env.VITE_API_URL;
 
+
 function PrescriptionForm() {
-     const { token: authToken } = useAuth();
+    const [sigTemplates, setSigTemplates] = useState([]);
+const [newTemplate, setNewTemplate] = useState({ title: '', instruction: '' });
+     const { token: authToken, doctor } = useAuth();
     const [patient, setPatient] = useState({ name: '', age: '', gender: 'Male' });
     const [prescriptions, setPrescriptions] = useState([]);
     const [diagnosis, setDiagnosis] = useState('');
     const [advice, setAdvice] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
+
+    // --- Fetch Templates on Load ---
+useEffect(() => {
+    const fetchTemplates = async () => {
+        if (!authToken) return;
+        try {
+            const response = await fetch(`${VITE_API_URL}/templates/sig`, {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setSigTemplates(data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch templates:', error);
+        }
+    };
+    fetchTemplates();
+}, [authToken, VITE_API_URL]);
+
+
+const handleSaveTemplate = async (e) => {
+    e.preventDefault();
+    if (!newTemplate.title || !newTemplate.instruction) {
+        alert('Template title and instruction are required.');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${VITE_API_URL}/templates/sig`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify(newTemplate),
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            // Add the new template to the state immediately
+            setSigTemplates([...sigTemplates, { ...newTemplate, template_id: data.templateId }]);
+            setNewTemplate({ title: '', instruction: '' }); // Clear input
+            alert('Template saved!');
+        } else {
+            const errorData = await response.json();
+            alert(`Error saving template: ${errorData.message}`);
+        }
+    } catch (error) {
+        console.error('Save template failed:', error);
+        alert('Network error saving template.');
+    }
+};
+
+
+// --- Handler to Apply Template to a Drug Item ---
+const applyTemplate = (tempId, instruction) => {
+    handlePrescriptionItemChange(tempId, 'sig_instruction', instruction);
+};
 
     // --- Handlers ---
     const handlePatientChange = (e) => {
@@ -140,32 +202,50 @@ function PrescriptionForm() {
     };
 
     return (
-        <div style={{ maxWidth: '1200px', margin: '20px auto', padding: '20px', border: '1px solid #ddd' }}>
-            <h2>New Patient Encounter & Prescription</h2>
+        <div className="max-w-7xl mx-auto p-5 border border-gray-200 rounded-xl shadow-lg my-8 bg-white">
+            <h2 className="text-3xl font-bold mb-6 text-indigo-700 border-b pb-2">New Patient Encounter & Prescription</h2>
             
             {/* 1. Patient Details */}
-            <fieldset style={{ marginBottom: '20px' }}>
-                <legend>Patient Details</legend>
-                <input type="text" name="name" placeholder="Name (Required)" value={patient.name} onChange={handlePatientChange} required />
-                <input type="number" name="age" placeholder="Age" value={patient.age} onChange={handlePatientChange} style={{ margin: '0 10px' }} />
-                <select name="gender" value={patient.gender} onChange={handlePatientChange}>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
-                </select>
+            <fieldset className="p-4 border border-gray-300 rounded-lg mb-6">
+                <legend className="text-lg font-semibold text-gray-700 px-2">Patient Details</legend>
+                <div className="flex flex-wrap gap-4 items-center">
+                    <input 
+                        className="p-2 border border-gray-300 rounded-md flex-1 min-w-[200px] focus:ring-indigo-500 focus:border-indigo-500"
+                        type="text" name="name" placeholder="Name (Required)" value={patient.name} onChange={handlePatientChange} required 
+                    />
+                    <input 
+                        className="p-2 border border-gray-300 rounded-md w-24 focus:ring-indigo-500 focus:border-indigo-500"
+                        type="number" name="age" placeholder="Age" value={patient.age} onChange={handlePatientChange} 
+                    />
+                    <select 
+                        className="p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                        name="gender" value={patient.gender} onChange={handlePatientChange}
+                    >
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
             </fieldset>
 
             {/* 2. Drug Search and Add */}
-            <fieldset style={{ marginBottom: '20px' }}>
-                <legend>Add Medication</legend>
-                <input type="text" placeholder="Search Drug Name (e.g., Napa, Amoxicillin)" value={searchQuery} onChange={handleSearch} />
+            <fieldset className="p-4 border border-gray-300 rounded-lg mb-6">
+                <legend className="text-lg font-semibold text-gray-700 px-2">Add Medication</legend>
+                <input 
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                    type="text" placeholder="Search Drug Name (e.g., Napa, Amoxicillin)" value={searchQuery} onChange={handleSearch} 
+                />
                 
                 {searchResults.length > 0 && (
-                    <ul style={{ listStyle: 'none', padding: 0, border: '1px solid #ccc', maxHeight: '200px', overflowY: 'auto' }}>
+                    <ul className="list-none p-0 mt-2 border border-gray-400 rounded-md max-h-52 overflow-y-auto shadow-md">
                         {searchResults.map(drug => (
-                            <li key={drug.drug_id} style={{ padding: '8px', borderBottom: '1px dotted #eee', cursor: 'pointer', backgroundColor: '#f9f9f9' }}
-                                onClick={() => addDrugToPrescription(drug)}>
-                                <strong>{drug.generic_name}</strong> ({drug.trade_names}) - {drug.strength}
+                            <li 
+                                key={drug.drug_id} 
+                                className="p-3 border-b border-gray-200 cursor-pointer hover:bg-indigo-50 transition-colors"
+                                onClick={() => addDrugToPrescription(drug)}
+                            >
+                                <strong className="font-medium text-gray-800">{drug.generic_name}</strong> 
+                                <span className="text-sm text-gray-500 ml-2">({drug.trade_names}) - {drug.strength}</span>
                             </li>
                         ))}
                     </ul>
@@ -173,30 +253,118 @@ function PrescriptionForm() {
             </fieldset>
 
             {/* 3. Prescription List */}
-            <fieldset style={{ marginBottom: '20px' }}>
-                <legend>Prescription List ({prescriptions.length})</legend>
-                {prescriptions.map(item => (
-                    <div key={item.tempId} style={{ display: 'flex', gap: '10px', alignItems: 'center', borderBottom: '1px solid #eee', padding: '10px 0' }}>
-                        <div style={{ flex: 1, fontWeight: 'bold' }}>{item.generic_name} ({item.strength})</div>
-                        <input type="text" placeholder="Quantity/Packs" style={{ width: '100px' }} value={item.quantity} 
-                            onChange={(e) => handlePrescriptionItemChange(item.tempId, 'quantity', e.target.value)} />
-                        <input type="text" placeholder="SIG (e.g., 1+0+1)" style={{ flex: 2 }} value={item.sig_instruction} 
-                            onChange={(e) => handlePrescriptionItemChange(item.tempId, 'sig_instruction', e.target.value)} />
-                        <input type="text" placeholder="Duration (e.g., 7 days)" style={{ width: '120px' }} value={item.duration} 
-                            onChange={(e) => handlePrescriptionItemChange(item.tempId, 'duration', e.target.value)} />
-                        <button type="button" onClick={() => removePrescriptionItem(item.tempId)} style={{ background: 'red', color: 'white', border: 'none' }}>X</button>
-                    </div>
-                ))}
+            <fieldset className="p-4 border border-gray-300 rounded-lg mb-6">
+                <legend className="text-lg font-semibold text-gray-700 px-2">Prescription List ({prescriptions.length})</legend>
+                {prescriptions.length === 0 ? (
+                    <p className="text-gray-500 italic">No medications added yet.</p>
+                ) : (
+                    prescriptions.map(item => (
+                        <div key={item.tempId} className="flex flex-wrap gap-2 md:gap-4 items-center border-b border-gray-200 py-3 last:border-b-0">
+                            <div className="font-bold text-indigo-600 flex-1 min-w-[150px]">{item.generic_name} ({item.strength})</div>
+                            <input 
+                                className="p-1 border border-gray-300 rounded-md w-24 focus:ring-indigo-500 focus:border-indigo-500 text-center"
+                                type="text" placeholder="Qty" value={item.quantity} 
+                                onChange={(e) => handlePrescriptionItemChange(item.tempId, 'quantity', e.target.value)} 
+                            />
+                            <input 
+                                className="p-1 border border-gray-300 rounded-md flex-2 min-w-[200px] focus:ring-indigo-500 focus:border-indigo-500"
+                                type="text" placeholder="SIG (e.g., 1+0+1)" value={item.sig_instruction} 
+                                onChange={(e) => handlePrescriptionItemChange(item.tempId, 'sig_instruction', e.target.value)} 
+                            />
+                            <input 
+                                className="p-1 border border-gray-300 rounded-md w-28 focus:ring-indigo-500 focus:border-indigo-500 text-center"
+                                type="text" placeholder="Duration" value={item.duration} 
+                                onChange={(e) => handlePrescriptionItemChange(item.tempId, 'duration', e.target.value)} 
+                            />
+                            <button 
+                                type="button" 
+                                onClick={() => removePrescriptionItem(item.tempId)} 
+                                className="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-md transition-colors"
+                            >
+                                Remove
+                            </button>
+                        </div>
+                    ))
+                )}
             </fieldset>
             
+            {/* 3.A SIG Templates */}
+            <fieldset className="p-4 border border-gray-300 rounded-lg mb-6">
+                <legend className="text-lg font-semibold text-gray-700 px-2">SIG Templates (Dosage Instructions)</legend>
+                
+                {/* Saved Templates List */}
+                <div className="flex flex-wrap gap-3 mb-4">
+                    {sigTemplates.length === 0 ? (
+                        <p className="text-gray-500 italic">No templates saved yet.</p>
+                    ) : (
+                        sigTemplates.map(template => (
+                            <button 
+                                key={template.template_id} 
+                                type="button"
+                                title={template.instruction}
+                                className="px-3 py-1 text-sm border border-indigo-400 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition-colors rounded-full font-medium shadow-sm"
+                                onClick={() => {
+                                    if (prescriptions.length > 0) {
+                                        const latestDrugId = prescriptions[prescriptions.length - 1].tempId;
+                                        applyTemplate(latestDrugId, template.instruction);
+                                    } else {
+                                        alert('Please add a drug first.');
+                                    }
+                                }}
+                            >
+                                {template.title}
+                            </button>
+                        ))
+                    )}
+                </div>
+
+                {/* Save New Template Form */}
+                <form onSubmit={handleSaveTemplate} className="flex flex-col md:flex-row gap-2">
+                    <input 
+                        className="p-2 border border-gray-300 rounded-md flex-1 focus:ring-indigo-500 focus:border-indigo-500"
+                        type="text" 
+                        placeholder="Template Title (e.g., TID 7 Days)" 
+                        value={newTemplate.title} 
+                        onChange={(e) => setNewTemplate({ ...newTemplate, title: e.target.value })}
+                        required
+                    />
+                    <input 
+                        className="p-2 border border-gray-300 rounded-md flex-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        type="text" 
+                        placeholder="Instruction (e.g., 1+0+1 for 7 days)" 
+                        value={newTemplate.instruction} 
+                        onChange={(e) => setNewTemplate({ ...newTemplate, instruction: e.target.value })}
+                        required
+                    />
+                    <button 
+                        type="submit" 
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md transition-colors shadow-md"
+                    >
+                        Save Template
+                    </button>
+                </form>
+            </fieldset>
+
             {/* 4. Patient Guide/Advice */}
-            <fieldset style={{ marginBottom: '20px' }}>
-                <legend>Patient Guide (Instructions)</legend>
-                <textarea placeholder="Diagnosis Text (e.g., Viral Fever, Sinusitis)" value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} rows="2" style={{ width: '100%', marginBottom: '10px' }}></textarea>
-                <textarea placeholder="General Advice (e.g., Rest well, Follow up in 3 days, Avoid cold drinks)" value={advice} onChange={(e) => setAdvice(e.target.value)} rows="4" style={{ width: '100%' }}></textarea>
+            <fieldset className="p-4 border border-gray-300 rounded-lg mb-8">
+                <legend className="text-lg font-semibold text-gray-700 px-2">Patient Guide (Instructions)</legend>
+                <textarea 
+                    className="w-full p-2 border border-gray-300 rounded-md mb-3 focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="Diagnosis Text (e.g., Viral Fever, Sinusitis)" 
+                    value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} rows="2"
+                ></textarea>
+                <textarea 
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="General Advice (e.g., Rest well, Follow up in 3 days, Avoid cold drinks)" 
+                    value={advice} onChange={(e) => setAdvice(e.target.value)} rows="4"
+                ></textarea>
             </fieldset>
             
-            <button type="submit" onClick={handleSubmit} style={{ padding: '10px 20px', fontSize: '16px', background: 'green', color: 'white' }}>
+            <button 
+                type="submit" 
+                onClick={handleSubmit} 
+                className="w-full py-3 text-xl font-semibold bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors shadow-lg"
+            >
                 Generate Prescription & Guide
             </button>
         </div>
