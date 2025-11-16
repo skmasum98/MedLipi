@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useAuth } from '../hooks/useAuth'; 
+import { useNavigate } from 'react-router'; 
 
-function Login({ setAuthToken }) {
+function Login() { 
     const [formData, setFormData] = useState({ email: '', password: '' });
     const [message, setMessage] = useState('');
-    const navigate = useNavigate();
+    
+    
+    const { login } = useAuth(); 
+    
+    
     const VITE_API_URL = import.meta.env.VITE_API_URL;
 
     const handleChange = (e) => {
@@ -25,12 +30,11 @@ function Login({ setAuthToken }) {
             const data = await response.json();
 
             if (response.ok) {
-                // SUCCESS: Store the token and update state
-                localStorage.setItem('token', data.token); 
-                setAuthToken(data.token); // Update state in App.jsx
+                
+                login(data.token); 
                 
                 setMessage('Login successful!');
-                navigate('/dashboard'); // Redirect to the protected dashboard
+                
             } else {
                 setMessage(`Login failed: ${data.message || 'Invalid credentials'}`);
             }

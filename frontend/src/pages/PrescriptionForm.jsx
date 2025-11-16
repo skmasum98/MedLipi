@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
+import { useAuth } from '../hooks/useAuth'; 
+
 
 const VITE_API_URL = import.meta.env.VITE_API_URL;
 
-function PrescriptionForm({ authToken }) {
+function PrescriptionForm() {
+     const { token: authToken } = useAuth();
     const [patient, setPatient] = useState({ name: '', age: '', gender: 'Male' });
     const [prescriptions, setPrescriptions] = useState([]);
     const [diagnosis, setDiagnosis] = useState('');
