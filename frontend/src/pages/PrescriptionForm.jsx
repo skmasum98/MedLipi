@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
+
 import { useAuth } from '../hooks/useAuth'; 
 
 
@@ -10,7 +10,11 @@ function PrescriptionForm() {
     const [sigTemplates, setSigTemplates] = useState([]);
 const [newTemplate, setNewTemplate] = useState({ title: '', instruction: '' });
      const { token: authToken, doctor } = useAuth();
-    const [patient, setPatient] = useState({ name: '', age: '', gender: 'Male' });
+    const [patient, setPatient] = useState({ name: '', age: '', gender: 'Male', id: null });
+    const [patientSearchQuery, setPatientSearchQuery] = useState(''); // New search state
+    const [patientSearchResults, setPatientSearchResults] = useState([]); // New results state
+    const [patientHistory, setPatientHistory] = useState([]); // New history state
+    const [isHistoryLoading, setIsHistoryLoading] = useState(false);
     const [prescriptions, setPrescriptions] = useState([]);
     const [diagnosis, setDiagnosis] = useState('');
     const [advice, setAdvice] = useState('');
@@ -36,6 +40,52 @@ useEffect(() => {
     fetchTemplates();
 }, [authToken, VITE_API_URL]);
 
+
+// --- New Handler: Search Patient ---
+const handlePatientSearch = async (e) => {
+    const query = e.target.value;
+    setPatientSearchQuery(query);
+    if (query.length < 3) return setPatientSearchResults([]);
+
+    try {
+        const response = await fetch(`${VITE_API_URL}/patients/search?q=${query}`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (response.ok) {
+            setPatientSearchResults(await response.json());
+        }
+    } catch (error) {
+        console.error('Patient search failed:', error);
+    }
+};
+
+// --- New Handler: Select Patient & Load History ---
+const selectPatient = async (selectedPatient) => {
+    // 1. Fill the form with patient data
+    setPatient({ 
+        name: selectedPatient.name, 
+        age: selectedPatient.age, 
+        gender: selectedPatient.gender, 
+        id: selectedPatient.patient_id // Store the ID
+    });
+    setPatientSearchQuery('');
+    setPatientSearchResults([]);
+
+    // 2. Fetch History
+    setIsHistoryLoading(true);
+    try {
+        const response = await fetch(`${VITE_API_URL}/patients/${selectedPatient.patient_id}/history`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (response.ok) {
+            setPatientHistory(await response.json());
+        }
+    } catch (error) {
+        console.error('Failed to load patient history:', error);
+    } finally {
+        setIsHistoryLoading(false);
+    }
+};
 
 const handleSaveTemplate = async (e) => {
     e.preventDefault();
@@ -134,7 +184,7 @@ const applyTemplate = (tempId, instruction) => {
         }
 
         const payload = {
-            patient,
+             patient: { ...patient, id: patient.id },
             // Only send necessary fields for prescription submission
             prescriptions: prescriptions.map(p => ({
                 drug_id: p.drug_id,
@@ -206,9 +256,52 @@ const applyTemplate = (tempId, instruction) => {
             <h2 className="text-3xl font-bold mb-6 text-indigo-700 border-b pb-2">New Patient Encounter & Prescription</h2>
             
             {/* 1. Patient Details */}
+             {/* 1. Patient Details */}
             <fieldset className="p-4 border border-gray-300 rounded-lg mb-6">
-                <legend className="text-lg font-semibold text-gray-700 px-2">Patient Details</legend>
-                <div className="flex flex-wrap gap-4 items-center">
+                <legend className="text-lg font-semibold text-gray-700 px-2">Patient Details & History</legend>
+                
+                {/* Search / New Patient Toggle */}
+                <div className="flex flex-col md:flex-row gap-4 mb-4">
+                    <div className="relative flex-1">
+                        <input 
+                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                            type="text" 
+                            placeholder="Search Existing Patient by Name..." 
+                            value={patientSearchQuery} 
+                            onChange={handlePatientSearch}
+                        />
+                        {/* Search Results Dropdown */}
+                        {patientSearchResults.length > 0 && (
+                            <ul className="absolute z-10 w-full bg-white border border-gray-400 rounded-md max-h-52 overflow-y-auto shadow-xl mt-1">
+                                {patientSearchResults.map(p => (
+                                    <li 
+                                        key={p.patient_id} 
+                                        className="p-3 border-b border-gray-200 cursor-pointer hover:bg-indigo-50 transition-colors"
+                                        onClick={() => selectPatient(p)}
+                                    >
+                                        <strong className="font-medium text-gray-800">{p.name}</strong> 
+                                        <span className="text-sm text-gray-500 ml-2">({p.age} yrs, {p.gender})</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                    {/* Clear/New Patient Button */}
+                    <button 
+                        type="button"
+                        onClick={() => {
+                            setPatient({ name: '', age: '', gender: 'Male', id: null });
+                            setPatientHistory([]);
+                            setPatientSearchQuery('');
+                        }}
+                        className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded-md transition-colors"
+                    >
+                        New Patient
+                    </button>
+                </div>
+
+                {/* Patient Input Fields (Always visible) */}
+                <div className="flex flex-wrap gap-4 items-center border-t pt-4">
                     <input 
                         className="p-2 border border-gray-300 rounded-md flex-1 min-w-[200px] focus:ring-indigo-500 focus:border-indigo-500"
                         type="text" name="name" placeholder="Name (Required)" value={patient.name} onChange={handlePatientChange} required 
@@ -226,6 +319,31 @@ const applyTemplate = (tempId, instruction) => {
                         <option value="Other">Other</option>
                     </select>
                 </div>
+
+                {/* Patient History Display Panel */}
+                {patient.id && (
+                    <div className="mt-6 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+                        <h4 className="font-semibold text-indigo-700 mb-2">Patient History ({patient.name})</h4>
+                        {isHistoryLoading ? (
+                            <p className="text-indigo-500">Loading history...</p>
+                        ) : patientHistory.length === 0 ? (
+                            <p className="text-gray-500 italic">No past prescriptions found.</p>
+                        ) : (
+                            <div className="max-h-48 overflow-y-auto space-y-3">
+                                {patientHistory.map((visit, index) => (
+                                    <div key={index} className="bg-white p-3 rounded-md shadow-sm border border-gray-100">
+                                        <p className="text-sm font-bold text-gray-800 mb-1">{visit.date} - Diagnosis: {visit.diagnosis || 'N/A'}</p>
+                                        <ul className="list-disc pl-5 text-xs text-gray-600">
+                                            {visit.prescriptions.map((p, pIndex) => (
+                                                <li key={pIndex}>{p.generic_name} ({p.strength}): {p.sig} ({p.duration})</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
             </fieldset>
 
             {/* 2. Drug Search and Add */}

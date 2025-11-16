@@ -17,10 +17,16 @@ router.post('/', async (req, res) => {
         connection = await pool.getConnection();
         await connection.beginTransaction();
 
-        // 1. Insert Patient (or find a match if V1.0 was implemented)
-        const patientQuery = `INSERT INTO patients (name, age, gender) VALUES (?, ?, ?)`;
-        const [patientResult] = await connection.query(patientQuery, [patient.name, patient.age || null, patient.gender]);
-        const patientId = patientResult.insertId;
+        let patientId = patient.id; 
+
+
+        // 1. Insert or Use Existing Patient
+        if (!patientId) {
+            // New Patient: Insert a new record
+            const patientQuery = `INSERT INTO patients (name, age, gender) VALUES (?, ?, ?)`;
+            const [patientResult] = await connection.query(patientQuery, [patient.name, patient.age || null, patient.gender]);
+            patientId = patientResult.insertId;
+        } 
 
         // 2. Insert all Prescriptions (One row per drug)
         for (const drug of prescriptions) {
