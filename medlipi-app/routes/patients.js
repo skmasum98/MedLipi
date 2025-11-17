@@ -43,8 +43,9 @@ router.get('/:patientId/history', async (req, res) => {
         // Fetch all prescriptions for a patient by this specific doctor
         const query = `
             SELECT 
-                pr.prescription_id, pr.created_at, pr.diagnosis_text, pr.general_advice,
-                di.generic_name, di.trade_names, di.strength, pr.sig_instruction, pr.quantity, pr.duration
+            pr.prescription_id, pr.created_at, pr.diagnosis_text, pr.general_advice,
+            di.drug_id,
+            di.generic_name, di.trade_names, di.strength, pr.sig_instruction, pr.quantity, pr.duration
             FROM prescriptions pr
             JOIN drug_inventory di ON pr.drug_id = di.drug_id
             WHERE pr.patient_id = ? AND pr.doctor_id = ?
@@ -65,6 +66,7 @@ router.get('/:patientId/history', async (req, res) => {
                 };
             }
             acc[date].prescriptions.push({
+                drug_id: item.drug_id,
                 generic_name: item.generic_name,
                 trade_names: item.trade_names,
                 strength: item.strength,

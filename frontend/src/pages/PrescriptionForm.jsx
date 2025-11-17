@@ -111,6 +111,45 @@ const selectPatient = async (selectedPatient) => {
     }
 };
 
+// --- New Handler: One-Click Re-Prescribe ---
+const handleRePrescribe = (pastPrescriptions) => {
+    // 1. Confirm with the doctor
+    if (!window.confirm(`Refill ${pastPrescriptions.length} items from the prescription on ${pastPrescriptions[0].date}?`)) {
+        return;
+    }
+
+    // 2. Map the past drugs to the current prescription format
+    const newItems = pastPrescriptions.map(p => ({
+        // Drug Inventory Fields (from history payload)
+        // We DON'T have the drug_id in the history payload, so we must add a lookup/fallback
+
+        // NOTE: The backend /history route needs to be updated to include drug_id. 
+        // For now, we'll use a placeholder and rely on the name/strength for display.
+        // We will fix the backend in Step 3/A.
+        drug_id: p.drug_id, 
+        generic_name: p.generic_name, 
+        strength: p.strength,
+        trade_names: p.trade_names,
+        counseling_points: 'Warning: Drug ID not loaded from history.', // Fallback counseling point
+
+        // Prescription Fields (from history payload)
+        quantity: p.quantity,
+        sig_instruction: p.sig, // Note: the history API returns 'sig'
+        duration: p.duration,
+        tempId: Date.now() + Math.random(), // New unique ID
+    }));
+
+    // 3. Update the main prescription list
+    setPrescriptions(prevPrescriptions => [...prevPrescriptions, ...newItems]);
+
+    // 4. Set diagnosis/advice (Optional, but useful)
+    // Find the diagnosis/advice from the first item (since the history API groups them)
+    setDiagnosis(pastPrescriptions[0].diagnosis_text || ''); 
+    setAdvice(pastPrescriptions[0].general_advice || ''); 
+    
+    alert('Prescription items loaded into the form!');
+};
+
 const handleSaveTemplate = async (e) => {
     e.preventDefault();
 
@@ -387,7 +426,6 @@ const applyInstructionBlock = (content) => {
             <h2 className="text-3xl font-bold mb-6 text-indigo-700 border-b pb-2">New Patient Encounter & Prescription</h2>
             
             {/* 1. Patient Details */}
-             {/* 1. Patient Details */}
             <fieldset className="p-4 border border-gray-300 rounded-lg mb-6">
                 <legend className="text-lg font-semibold text-gray-700 px-2">Patient Details & History</legend>
                 
@@ -455,15 +493,28 @@ const applyInstructionBlock = (content) => {
                 {patient.id && (
                     <div className="mt-6 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
                         <h4 className="font-semibold text-indigo-700 mb-2">Patient History ({patient.name})</h4>
-                        {isHistoryLoading ? (
-                            <p className="text-indigo-500">Loading history...</p>
-                        ) : patientHistory.length === 0 ? (
-                            <p className="text-gray-500 italic">No past prescriptions found.</p>
-                        ) : (
+                        {/* ... (loading/no history checks) ... */}
+                        {patientHistory.length > 0 && (
                             <div className="max-h-48 overflow-y-auto space-y-3">
                                 {patientHistory.map((visit, index) => (
                                     <div key={index} className="bg-white p-3 rounded-md shadow-sm border border-gray-100">
-                                        <p className="text-sm font-bold text-gray-800 mb-1">{visit.date} - Diagnosis: {visit.diagnosis || 'N/A'}</p>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <p className="text-sm font-bold text-gray-800">
+                                                {visit.date} - Diagnosis: {visit.diagnosis || 'N/A'}
+                                            </p>
+                                            
+                                            {/* --- RE-PRESCRIBE BUTTON --- */}
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRePrescribe(visit.prescriptions)} 
+                                                className="bg-green-500 hover:bg-green-600 text-white text-xs py-1 px-3 rounded-full transition-colors font-medium shadow-sm"
+                                                title="Load this prescription to the current form"
+                                            >
+                                                Refill / Re-Prescribe
+                                            </button>
+                                            {/* ------------------------- */}
+                                        </div>
+
                                         <ul className="list-disc pl-5 text-xs text-gray-600">
                                             {visit.prescriptions.map((p, pIndex) => (
                                                 <li key={pIndex}>{p.generic_name} ({p.strength}): {p.sig} ({p.duration})</li>
@@ -581,109 +632,109 @@ const applyInstructionBlock = (content) => {
 
             {/* SIG modal */}
             <Modal 
-    isOpen={isSigModalOpen} 
-    onClose={() => { 
-        setIsSigModalOpen(false); 
-        setEditingSigTemplate(null); 
-        
-        setNewTemplate({ title: '', instruction: '' }); 
-    }} 
-    title={editingSigTemplate ? "Edit SIG Template" : "Create New SIG Template"}
->
-    {/* Management/List View */}
-    {!editingSigTemplate && (
-        <div className="mb-6">
-            <h4 className="text-lg font-medium mb-2">My Saved Templates</h4>
-            <div className="max-h-40 overflow-y-auto space-y-2 border p-2 rounded-md">
-                {sigTemplates.map(template => (
-                    <div key={template.template_id} className="flex justify-between items-center p-2 bg-gray-50 rounded-md">
-                        <span className="text-sm font-medium">{template.title}</span>
-                        <div className="space-x-2">
+                isOpen={isSigModalOpen} 
+                onClose={() => { 
+                    setIsSigModalOpen(false); 
+                    setEditingSigTemplate(null); 
+                    
+                    setNewTemplate({ title: '', instruction: '' }); 
+                }} 
+                title={editingSigTemplate ? "Edit SIG Template" : "Create New SIG Template"}
+            >
+                {/* Management/List View */}
+                {!editingSigTemplate && (
+                    <div className="mb-6">
+                        <h4 className="text-lg font-medium mb-2">My Saved Templates</h4>
+                        <div className="max-h-40 overflow-y-auto space-y-2 border p-2 rounded-md">
+                            {sigTemplates.map(template => (
+                                <div key={template.template_id} className="flex justify-between items-center p-2 bg-gray-50 rounded-md">
+                                    <span className="text-sm font-medium">{template.title}</span>
+                                    <div className="space-x-2">
+                                        <button 
+                                            type="button" 
+                                            onClick={() => { setEditingSigTemplate(template); setNewTemplate(template); }}
+                                            className="text-xs text-indigo-600 hover:text-indigo-800"
+                                        >
+                                            Edit
+                                        </button>
+                                        <button 
+                                            type="button" 
+                                            onClick={() => handleDeleteTemplate(template.template_id)}
+                                            className="text-xs text-red-600 hover:text-red-800"
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <button 
+                            type="button" 
+                            onClick={() => {
+                                setEditingSigTemplate({ template_id: null }); 
+                                setNewTemplate({ title: '', instruction: '' }); 
+                            }}
+                            className="mt-4 w-full py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+                        >
+                            + Create New Template
+                        </button>
+                    </div>
+                )}
+
+                {/* Create/Edit Form View */}
+                {(editingSigTemplate || !sigTemplates.length) && (
+                    <form onSubmit={handleSaveTemplate} className="flex flex-col gap-4 pt-4 border-t">
+                        <p className="text-sm text-gray-600">
+                            {editingSigTemplate ? 'Modify the selected template.' : 'Create a new template.'}
+                        </p>
+                        {/* Title Input */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Template Title</label>
+                            <input 
+                                className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                                type="text" 
+                                placeholder="e.g., TID 7 Days" 
+                                value={newTemplate.title} 
+                                onChange={(e) => setNewTemplate({ ...newTemplate, title: e.target.value })}
+                                required
+                            />
+                        </div>
+
+                        {/* Instruction Input */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Instruction (SIG)</label>
+                            <input 
+                                className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                                type="text" 
+                                placeholder="e.g., Take 1 tablet three times a day for 7 days" 
+                                value={newTemplate.instruction} 
+                                onChange={(e) => setNewTemplate({ ...newTemplate, instruction: e.target.value })}
+                                required
+                            />
+                        </div>
+
+                        {/* Modal Actions */}
+                        <div className="flex justify-end space-x-3 mt-4">
                             <button 
-                                type="button" 
-                                onClick={() => { setEditingSigTemplate(template); setNewTemplate(template); }}
-                                className="text-xs text-indigo-600 hover:text-indigo-800"
+                                type="button"
+                                onClick={() => {
+                                    setEditingSigTemplate(null);
+                                    setNewTemplate({ title: '', instruction: '' }); 
+                                }}
+                                className="py-2 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                             >
-                                Edit
+                                {editingSigTemplate ? 'Cancel Edit' : 'Cancel'}
                             </button>
                             <button 
-                                type="button" 
-                                onClick={() => handleDeleteTemplate(template.template_id)}
-                                className="text-xs text-red-600 hover:text-red-800"
+                                type="submit" 
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md text-sm transition-colors shadow-md"
                             >
-                                Delete
+                                {editingSigTemplate ? 'Update Template' : 'Save Template'}
                             </button>
                         </div>
-                    </div>
-                ))}
-            </div>
-            <button 
-                type="button" 
-                onClick={() => {
-                    setEditingSigTemplate({ template_id: null }); 
-                    setNewTemplate({ title: '', instruction: '' }); 
-                }}
-                className="mt-4 w-full py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
-            >
-                + Create New Template
-            </button>
-        </div>
-    )}
-
-    {/* Create/Edit Form View */}
-    {(editingSigTemplate || !sigTemplates.length) && (
-        <form onSubmit={handleSaveTemplate} className="flex flex-col gap-4 pt-4 border-t">
-            <p className="text-sm text-gray-600">
-                {editingSigTemplate ? 'Modify the selected template.' : 'Create a new template.'}
-            </p>
-            {/* Title Input */}
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Template Title</label>
-                <input 
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                    type="text" 
-                    placeholder="e.g., TID 7 Days" 
-                    value={newTemplate.title} 
-                    onChange={(e) => setNewTemplate({ ...newTemplate, title: e.target.value })}
-                    required
-                />
-            </div>
-
-            {/* Instruction Input */}
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Instruction (SIG)</label>
-                <input 
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                    type="text" 
-                    placeholder="e.g., Take 1 tablet three times a day for 7 days" 
-                    value={newTemplate.instruction} 
-                    onChange={(e) => setNewTemplate({ ...newTemplate, instruction: e.target.value })}
-                    required
-                />
-            </div>
-
-            {/* Modal Actions */}
-            <div className="flex justify-end space-x-3 mt-4">
-                <button 
-                    type="button"
-                    onClick={() => {
-                        setEditingSigTemplate(null);
-                        setNewTemplate({ title: '', instruction: '' }); 
-                    }}
-                    className="py-2 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                    {editingSigTemplate ? 'Cancel Edit' : 'Cancel'}
-                </button>
-                <button 
-                    type="submit" 
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md text-sm transition-colors shadow-md"
-                >
-                    {editingSigTemplate ? 'Update Template' : 'Save Template'}
-                </button>
-            </div>
-        </form>
-    )}
-</Modal>
+                    </form>
+                )}
+            </Modal>
 
             {/* 4. Patient Guide/Advice */}
             <fieldset className="p-4 border border-gray-300 rounded-lg mb-8">
