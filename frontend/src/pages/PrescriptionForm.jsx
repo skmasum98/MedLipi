@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 import { useAuth } from '../hooks/useAuth'; 
+import Modal from '../components/Modal';
 
 
 const VITE_API_URL = import.meta.env.VITE_API_URL;
@@ -20,6 +21,11 @@ const [newTemplate, setNewTemplate] = useState({ title: '', instruction: '' });
     const [advice, setAdvice] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
+    const [instructionBlocks, setInstructionBlocks] = useState([]); 
+    const [newInstructionBlock, setNewInstructionBlock] = useState({ title: '', content: '' });
+    const [isInstructionModalOpen, setIsInstructionModalOpen] = useState(false); 
+    const [isSigModalOpen, setIsSigModalOpen] = useState(false); 
+
 
     // --- Fetch Templates on Load ---
 useEffect(() => {
@@ -37,7 +43,23 @@ useEffect(() => {
             console.error('Failed to fetch templates:', error);
         }
     };
+
+    const fetchInstructionBlocks = async () => {
+        if (!authToken) return;
+        try {
+            const response = await fetch(`${VITE_API_URL}/templates/instruction`, {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            if (response.ok) {
+                setInstructionBlocks(await response.json());
+            }
+        } catch (error) {
+            console.error('Failed to fetch instruction blocks:', error);
+        }
+    };
+
     fetchTemplates();
+    fetchInstructionBlocks();
 }, [authToken, VITE_API_URL]);
 
 
@@ -110,6 +132,7 @@ const handleSaveTemplate = async (e) => {
             setSigTemplates([...sigTemplates, { ...newTemplate, template_id: data.templateId }]);
             setNewTemplate({ title: '', instruction: '' }); // Clear input
             alert('Template saved!');
+             setIsSigModalOpen(false); 
         } else {
             const errorData = await response.json();
             alert(`Error saving template: ${errorData.message}`);
@@ -173,6 +196,45 @@ const applyTemplate = (tempId, instruction) => {
     const removePrescriptionItem = (tempId) => {
         setPrescriptions(prescriptions.filter(item => item.tempId !== tempId));
     };
+
+
+    // --- Handler to Save a New Instruction Block ---
+const handleSaveInstructionBlock = async (e) => {
+    e.preventDefault();
+    if (!newInstructionBlock.title || !newInstructionBlock.content) {
+        alert('Title and content are required.');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${VITE_API_URL}/templates/instruction`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+            body: JSON.stringify(newInstructionBlock),
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            setInstructionBlocks([...instructionBlocks, { ...newInstructionBlock, block_id: data.blockId }]);
+            setNewInstructionBlock({ title: '', content: '' }); 
+            alert('Instruction block saved!');
+            setIsInstructionModalOpen(false);
+        } else {
+            const errorData = await response.json();
+            alert(`Error saving block: ${errorData.message}`);
+        }
+    } catch (error) {
+        console.error('Save block failed:', error);
+        alert('Network error saving block.');
+    }
+};
+
+
+// --- Handler to Apply Instruction Block to Advice ---
+const applyInstructionBlock = (content) => {
+    // Append the content to the existing advice, adding a newline separator
+    setAdvice(prevAdvice => (prevAdvice ? prevAdvice + '\n\n---\n\n' : '') + content);
+};
 
     // --- Submission ---
      const handleSubmit = async (e) => {
@@ -410,10 +472,12 @@ const applyTemplate = (tempId, instruction) => {
             <fieldset className="p-4 border border-gray-300 rounded-lg mb-6">
                 <legend className="text-lg font-semibold text-gray-700 px-2">SIG Templates (Dosage Instructions)</legend>
                 
-                {/* Saved Templates List */}
-                <div className="flex flex-wrap gap-3 mb-4">
+                {/* Saved Templates List and Modal Button */}
+                <div className="flex flex-wrap gap-3 mb-4 items-center border-b pb-4 border-gray-200">
+                    <p className="text-sm font-medium text-gray-700 mr-2">Quick Commands:</p>
+
                     {sigTemplates.length === 0 ? (
-                        <p className="text-gray-500 italic">No templates saved yet.</p>
+                        <p className="text-gray-500 italic text-sm mr-4">No templates. </p>
                     ) : (
                         sigTemplates.map(template => (
                             <button 
@@ -434,47 +498,118 @@ const applyTemplate = (tempId, instruction) => {
                             </button>
                         ))
                     )}
-                </div>
-
-                {/* Save New Template Form */}
-                <form onSubmit={handleSaveTemplate} className="flex flex-col md:flex-row gap-2">
-                    <input 
-                        className="p-2 border border-gray-300 rounded-md flex-1 focus:ring-indigo-500 focus:border-indigo-500"
-                        type="text" 
-                        placeholder="Template Title (e.g., TID 7 Days)" 
-                        value={newTemplate.title} 
-                        onChange={(e) => setNewTemplate({ ...newTemplate, title: e.target.value })}
-                        required
-                    />
-                    <input 
-                        className="p-2 border border-gray-300 rounded-md flex-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        type="text" 
-                        placeholder="Instruction (e.g., 1+0+1 for 7 days)" 
-                        value={newTemplate.instruction} 
-                        onChange={(e) => setNewTemplate({ ...newTemplate, instruction: e.target.value })}
-                        required
-                    />
+                    
+                    {/* BUTTON TO OPEN SIG MODAL */}
                     <button 
-                        type="submit" 
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md transition-colors shadow-md"
+                        type="button"
+                        onClick={() => setIsSigModalOpen(true)}
+                        className="px-3 py-1 text-sm border border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-700 transition-colors rounded-full font-medium shadow-md ml-auto"
                     >
-                        Save Template
+                        + Create/Manage Templates
                     </button>
-                </form>
+                </div>
             </fieldset>
+
+            {/* ... rest of the PrescriptionForm JSX ... */}
+            
+            {/* --- NEW SIG MODAL COMPONENT --- */}
+            <Modal 
+                isOpen={isSigModalOpen} 
+                onClose={() => setIsSigModalOpen(false)} 
+                title="Create New SIG Template"
+            >
+                <form onSubmit={handleSaveTemplate} className="flex flex-col gap-4">
+                    <p className="text-sm text-gray-600">Save common dosage instructions for rapid input (e.g., 1+0+1, 7 days).</p>
+                    
+                    {/* Title Input */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Template Title</label>
+                        <input 
+                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                            type="text" 
+                            placeholder="e.g., TID 7 Days" 
+                            value={newTemplate.title} 
+                            onChange={(e) => setNewTemplate({ ...newTemplate, title: e.target.value })}
+                            required
+                        />
+                    </div>
+
+                    {/* Instruction Input */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Instruction (SIG)</label>
+                        <input 
+                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                            type="text" 
+                            placeholder="e.g., Take 1 tablet three times a day for 7 days" 
+                            value={newTemplate.instruction} 
+                            onChange={(e) => setNewTemplate({ ...newTemplate, instruction: e.target.value })}
+                            required
+                        />
+                    </div>
+
+                    {/* Modal Actions */}
+                    <div className="flex justify-end space-x-3 mt-4">
+                        <button 
+                            type="button"
+                            onClick={() => setIsSigModalOpen(false)}
+                            className="py-2 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button 
+                            type="submit" 
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md text-sm transition-colors shadow-md"
+                        >
+                            Save Template
+                        </button>
+                    </div>
+                </form>
+            </Modal>
 
             {/* 4. Patient Guide/Advice */}
             <fieldset className="p-4 border border-gray-300 rounded-lg mb-8">
                 <legend className="text-lg font-semibold text-gray-700 px-2">Patient Guide (Instructions)</legend>
-                <textarea 
-                    className="w-full p-2 border border-gray-300 rounded-md mb-3 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="Diagnosis Text (e.g., Viral Fever, Sinusitis)" 
-                    value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} rows="2"
-                ></textarea>
+                
+                {/* Instruction Blocks List and Modal Button */}
+                <div className="flex flex-wrap gap-3 mb-4 items-center border-b pb-4 border-gray-200">
+                    <p className="text-sm font-medium text-gray-700 mr-2">Quick Blocks:</p>
+                    
+                    {instructionBlocks.length === 0 ? (
+                        <p className="text-gray-500 italic text-sm mr-4">No blocks. </p>
+                    ) : (
+                        instructionBlocks.map(block => (
+                            <button 
+                                key={block.block_id} 
+                                type="button"
+                                title={block.content}
+                                className="px-3 py-1 text-sm border border-pink-400 bg-pink-100 text-pink-700 hover:bg-pink-200 transition-colors rounded-full font-medium shadow-sm"
+                                onClick={() => applyInstructionBlock(block.content)}
+                            >
+                                {block.title}
+                            </button>
+                        ))
+                    )}
+                    
+                    {/* BUTTON TO OPEN MODAL */}
+                    <button 
+                        type="button"
+                        onClick={() => setIsInstructionModalOpen(true)}
+                        className="px-3 py-1 text-sm border border-pink-600 bg-pink-600 text-white hover:bg-pink-700 transition-colors rounded-full font-medium shadow-md ml-auto"
+                    >
+                        + Create/Manage Blocks
+                    </button>
+                </div>
+                
+                {/* Main Advice Textarea */}
                 <textarea 
                     className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="General Advice (e.g., Rest well, Follow up in 3 days, Avoid cold drinks)" 
+                    placeholder="General Advice (Rest, Follow up, etc.) - Content from blocks is appended here." 
                     value={advice} onChange={(e) => setAdvice(e.target.value)} rows="4"
+                ></textarea>
+                <textarea 
+                    className="w-full p-2 border border-gray-300 rounded-md mb-3 focus:ring-indigo-500 focus:border-indigo-500 mt-4"
+                    placeholder="Diagnosis Text (e.g., Viral Fever, Sinusitis)" 
+                    value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} rows="2"
                 ></textarea>
             </fieldset>
             
@@ -485,6 +620,60 @@ const applyTemplate = (tempId, instruction) => {
             >
                 Generate Prescription & Guide
             </button>
+
+            <Modal 
+                isOpen={isInstructionModalOpen} 
+                onClose={() => setIsInstructionModalOpen(false)} 
+                title="Create New Instruction Block"
+            >
+                {/* The Form is now the Children of the Modal */}
+                <form onSubmit={handleSaveInstructionBlock} className="flex flex-col gap-4">
+                    <p className="text-sm text-gray-600">Save a standardized advice template for quick use in future prescriptions.</p>
+                    
+                    {/* Title Input */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Block Title</label>
+                        <input 
+                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-pink-500 focus:border-pink-500"
+                            type="text" 
+                            placeholder="e.g., Dengue Fever Care" 
+                            value={newInstructionBlock.title} 
+                            onChange={(e) => setNewInstructionBlock({ ...newInstructionBlock, title: e.target.value })}
+                            required
+                        />
+                    </div>
+
+                    {/* Content Textarea */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Detailed Content for Patient Handout</label>
+                        <textarea 
+                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-pink-500 focus:border-pink-500"
+                            placeholder="E.g., Rest well, drink plenty of fluids, and avoid NSAIDs like Ibuprofen." 
+                            value={newInstructionBlock.content} 
+                            onChange={(e) => setNewInstructionBlock({ ...newInstructionBlock, content: e.target.value })}
+                            rows="4"
+                            required
+                        />
+                    </div>
+
+                    {/* Modal Actions */}
+                    <div className="flex justify-end space-x-3 mt-4">
+                        <button 
+                            type="button"
+                            onClick={() => setIsInstructionModalOpen(false)}
+                            className="py-2 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button 
+                            type="submit" 
+                            className="bg-pink-600 hover:bg-pink-700 text-white font-bold py-2 px-4 rounded-md text-sm transition-colors shadow-md"
+                        >
+                            Save Block
+                        </button>
+                    </div>
+                </form>
+            </Modal>
         </div>
     );
 }

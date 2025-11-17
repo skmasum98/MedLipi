@@ -43,4 +43,45 @@ router.post('/sig', async (req, res) => {
     }
 });
 
+
+// --- GET All Instruction Templates (Global and Doctor's Own) ---
+router.get('/instruction', async (req, res) => {
+    const doctorId = req.doctor.id;
+    try {
+        const query = `
+            SELECT block_id, title, content 
+            FROM instruction_blocks 
+            WHERE doctor_id IS NULL OR doctor_id = ? 
+            ORDER BY is_global DESC, title ASC
+        `;
+        const [templates] = await pool.query(query, [doctorId]);
+        res.json(templates);
+    } catch (error) {
+        console.error('Error fetching instruction templates:', error);
+        res.status(500).json({ message: 'Server error fetching instruction templates.' });
+    }
+});
+
+// --- POST Create a New Instruction Block ---
+router.post('/instruction', async (req, res) => {
+    const { title, content } = req.body;
+    const doctorId = req.doctor.id;
+
+    if (!title || !content) {
+        return res.status(400).json({ message: 'Title and content are required.' });
+    }
+
+    try {
+        const query = 'INSERT INTO instruction_blocks (doctor_id, title, content) VALUES (?, ?, ?)';
+        const [result] = await pool.query(query, [doctorId, title, content]);
+        res.status(201).json({ 
+            message: 'Instruction block saved successfully', 
+            blockId: result.insertId 
+        });
+    } catch (error) {
+        console.error('Error saving instruction block:', error);
+        res.status(500).json({ message: 'Server error saving instruction block.' });
+    }
+});
+
 export default router;
