@@ -12,6 +12,7 @@ import inventoryRoutes from './routes/inventory.js';
 import prescriptionRoutes from './routes/prescriptions.js'; 
 import templateRoutes from './routes/templates.js'; 
 import patientRoutes from './routes/patients.js';
+import interactionRoutes from './routes/interactions.js'; 
 
 // Initialize Express App
 const app = express();
@@ -34,6 +35,7 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/prescriptions', prescriptionRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/patients', patientRoutes);
+app.use('/api/interactions', interactionRoutes); 
 
 
 // Start Server

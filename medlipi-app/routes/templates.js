@@ -112,6 +112,10 @@ router.get('/instruction', async (req, res) => {
 
 // --- POST Create a New Instruction Block ---
 router.post('/instruction', async (req, res) => {
+     let { drug1_id, drug2_id, severity, warning_message } = req.body;
+     if (drug1_id > drug2_id) {
+        [drug1_id, drug2_id] = [drug2_id, drug1_id]; // Swap the values
+    }
     const { title, content } = req.body;
     const doctorId = req.doctor.id;
 

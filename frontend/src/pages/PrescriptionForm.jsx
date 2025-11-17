@@ -9,14 +9,15 @@ const VITE_API_URL = import.meta.env.VITE_API_URL;
 
 function PrescriptionForm() {
     const [sigTemplates, setSigTemplates] = useState([]);
-const [newTemplate, setNewTemplate] = useState({ title: '', instruction: '' });
-     const { token: authToken, doctor } = useAuth();
+    const [newTemplate, setNewTemplate] = useState({ title: '', instruction: '' });
+    const { token: authToken, doctor } = useAuth();
     const [patient, setPatient] = useState({ name: '', age: '', gender: 'Male', id: null });
-    const [patientSearchQuery, setPatientSearchQuery] = useState(''); // New search state
-    const [patientSearchResults, setPatientSearchResults] = useState([]); // New results state
-    const [patientHistory, setPatientHistory] = useState([]); // New history state
+    const [patientSearchQuery, setPatientSearchQuery] = useState(''); 
+    const [patientSearchResults, setPatientSearchResults] = useState([]); 
+    const [patientHistory, setPatientHistory] = useState([]); 
     const [isHistoryLoading, setIsHistoryLoading] = useState(false);
     const [prescriptions, setPrescriptions] = useState([]);
+    const [interactionWarnings, setInteractionWarnings] = useState([]); 
     const [diagnosis, setDiagnosis] = useState('');
     const [advice, setAdvice] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
@@ -64,6 +65,48 @@ useEffect(() => {
     fetchInstructionBlocks();
 }, [authToken, VITE_API_URL]);
 
+// --- New Effect: Check Interactions on Prescription Change ---
+useEffect(() => {
+    const checkInteractions = async () => {
+        if (!authToken || prescriptions.length < 2) {
+            return setInteractionWarnings([]); // Clear warnings if less than 2 drugs
+        }
+
+        // 1. Get unique drug IDs from the current prescription list
+        const drugIds = [...new Set(prescriptions.map(p => p.drug_id).filter(id => id))];
+        
+        if (drugIds.length < 2) {
+             return setInteractionWarnings([]);
+        }
+
+        try {
+            const response = await fetch(`${VITE_API_URL}/interactions/check`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({ drugIds }),
+            });
+            
+            if (response.ok) {
+                const warnings = await response.json();
+                setInteractionWarnings(warnings);
+            }
+        } catch (error) {
+            console.error('Failed to run interaction check:', error);
+            // Don't show an alert here, just log silently
+        }
+    };
+    
+    // Debounce the check slightly to avoid hitting the API too many times while typing
+    const timer = setTimeout(() => {
+        checkInteractions();
+    }, 500); 
+
+    return () => clearTimeout(timer); // Cleanup function
+
+}, [prescriptions, authToken, VITE_API_URL]);
 
 // --- New Handler: Search Patient ---
 const handlePatientSearch = async (e) => {
@@ -130,7 +173,7 @@ const handleRePrescribe = (pastPrescriptions) => {
         generic_name: p.generic_name, 
         strength: p.strength,
         trade_names: p.trade_names,
-        counseling_points: 'Warning: Drug ID not loaded from history.', // Fallback counseling point
+        counseling_points: p.counseling_points || '', 
 
         // Prescription Fields (from history payload)
         quantity: p.quantity,
@@ -551,6 +594,28 @@ const applyInstructionBlock = (content) => {
                     </ul>
                 )}
             </fieldset>
+
+            {/* --- Interaction Warning Panel (NEW UI) --- */}
+            {interactionWarnings.length > 0 && (
+                <div className="mb-6 p-4 border border-red-400 bg-red-100 rounded-lg shadow-md">
+                    <h4 className="flex items-center text-lg font-semibold text-red-700 mb-2">
+                        {/* Warning Icon (simplified for text) */}
+                        ⚠️ DRUG INTERACTION ALERT
+                    </h4>
+                    <ul className="list-disc pl-5 space-y-2 text-sm text-red-800">
+                        {interactionWarnings.map((warning, index) => (
+                            <li key={index}>
+                                <span className={`font-bold ${warning.severity === 'High' ? 'text-red-900' : ''}`}>
+                                    {warning.severity} Risk: 
+                                </span> 
+                                Interaction between **{warning.drug1_name}** and **{warning.drug2_name}**. 
+                                <p className="mt-0.5 text-xs italic">{warning.warning_message}</p>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
 
             {/* 3. Prescription List */}
             <fieldset className="p-4 border border-gray-300 rounded-lg mb-6">
