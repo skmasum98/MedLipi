@@ -43,6 +43,54 @@ router.post('/sig', async (req, res) => {
     }
 });
 
+// --- PUT Update SIG Template (/api/templates/sig/:id) - (U) ---
+router.put('/sig/:id', async (req, res) => {
+    const templateId = req.params.id;
+    const { title, instruction } = req.body;
+    const doctorId = req.doctor.id;
+
+    if (!title || !instruction) {
+        return res.status(400).json({ message: 'Title and instruction are required.' });
+    }
+
+    try {
+        const query = `
+            UPDATE sig_templates 
+            SET title = ?, instruction = ? 
+            WHERE template_id = ? AND doctor_id = ?
+        `;
+        const [result] = await pool.query(query, [title, instruction, templateId, doctorId]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Template not found or you do not have permission to edit.' });
+        }
+        res.json({ message: 'Template updated successfully' });
+    } catch (error) {
+        console.error('Error updating SIG template:', error);
+        res.status(500).json({ message: 'Server error updating template.' });
+    }
+});
+
+
+// --- DELETE SIG Template (/api/templates/sig/:id) - (D) ---
+router.delete('/sig/:id', async (req, res) => {
+    const templateId = req.params.id;
+    const doctorId = req.doctor.id;
+
+    try {
+        const query = 'DELETE FROM sig_templates WHERE template_id = ? AND doctor_id = ?';
+        const [result] = await pool.query(query, [templateId, doctorId]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Template not found or you do not have permission to delete.' });
+        }
+        res.json({ message: 'Template deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting SIG template:', error);
+        res.status(500).json({ message: 'Server error deleting template.' });
+    }
+});
+
 
 // --- GET All Instruction Templates (Global and Doctor's Own) ---
 router.get('/instruction', async (req, res) => {
@@ -81,6 +129,56 @@ router.post('/instruction', async (req, res) => {
     } catch (error) {
         console.error('Error saving instruction block:', error);
         res.status(500).json({ message: 'Server error saving instruction block.' });
+    }
+});
+
+// --- PUT Update Instruction Block (/api/templates/instruction/:id) - (U) ---
+router.put('/instruction/:id', async (req, res) => {
+    const blockId = req.params.id;
+    const { title, content } = req.body;
+    const doctorId = req.doctor.id;
+
+    if (!title || !content) {
+        return res.status(400).json({ message: 'Title and content are required.' });
+    }
+
+    try {
+        // Only allow update if doctor_id is NOT NULL (i.e., not a 'Global' template)
+        const query = `
+            UPDATE instruction_blocks 
+            SET title = ?, content = ? 
+            WHERE block_id = ? AND doctor_id = ?
+        `;
+        const [result] = await pool.query(query, [title, content, blockId, doctorId]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Block not found or you do not have permission to edit.' });
+        }
+        res.json({ message: 'Block updated successfully' });
+    } catch (error) {
+        console.error('Error updating instruction block:', error);
+        res.status(500).json({ message: 'Server error updating block.' });
+    }
+});
+
+
+// --- DELETE Instruction Block (/api/templates/instruction/:id) - (D) ---
+router.delete('/instruction/:id', async (req, res) => {
+    const blockId = req.params.id;
+    const doctorId = req.doctor.id;
+
+    try {
+        // Only allow delete if doctor_id is NOT NULL (i.e., not a 'Global' template)
+        const query = 'DELETE FROM instruction_blocks WHERE block_id = ? AND doctor_id = ?';
+        const [result] = await pool.query(query, [blockId, doctorId]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Block not found or you do not have permission to delete.' });
+        }
+        res.json({ message: 'Block deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting instruction block:', error);
+        res.status(500).json({ message: 'Server error deleting block.' });
     }
 });
 

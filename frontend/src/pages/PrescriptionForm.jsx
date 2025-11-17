@@ -25,6 +25,8 @@ const [newTemplate, setNewTemplate] = useState({ title: '', instruction: '' });
     const [newInstructionBlock, setNewInstructionBlock] = useState({ title: '', content: '' });
     const [isInstructionModalOpen, setIsInstructionModalOpen] = useState(false); 
     const [isSigModalOpen, setIsSigModalOpen] = useState(false); 
+    const [editingSigTemplate, setEditingSigTemplate] = useState(null); 
+    const [editingInstructionBlock, setEditingInstructionBlock] = useState(null); 
 
 
     // --- Fetch Templates on Load ---
@@ -111,28 +113,39 @@ const selectPatient = async (selectedPatient) => {
 
 const handleSaveTemplate = async (e) => {
     e.preventDefault();
+
+
     if (!newTemplate.title || !newTemplate.instruction) {
         alert('Template title and instruction are required.');
         return;
     }
 
+    const templateId = editingSigTemplate?.template_id; 
+    const isEditing = !!templateId && typeof templateId === 'number'; 
+
+    const url = isEditing ? 
+        `${VITE_API_URL}/templates/sig/${templateId}` : 
+        `${VITE_API_URL}/templates/sig`;
+    const method = isEditing ? 'PUT' : 'POST';
+
     try {
-        const response = await fetch(`${VITE_API_URL}/templates/sig`, {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authToken}`
-            },
+        const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
             body: JSON.stringify(newTemplate),
         });
         
         if (response.ok) {
-            const data = await response.json();
-            // Add the new template to the state immediately
-            setSigTemplates([...sigTemplates, { ...newTemplate, template_id: data.templateId }]);
-            setNewTemplate({ title: '', instruction: '' }); // Clear input
-            alert('Template saved!');
-             setIsSigModalOpen(false); 
+            // Update the list (read logic)
+            const updatedList = isEditing ? 
+                sigTemplates.map(t => t.template_id === editingSigTemplate.template_id ? { ...t, ...newTemplate } : t) :
+                [...sigTemplates, { ...newTemplate, template_id: (await response.json()).templateId }];
+            
+            setSigTemplates(updatedList);
+            setNewTemplate({ title: '', instruction: '' }); 
+            setEditingSigTemplate(null); // Exit editing mode
+            alert(`Template ${isEditing ? 'updated' : 'saved'}!`);
+            setIsSigModalOpen(false); 
         } else {
             const errorData = await response.json();
             alert(`Error saving template: ${errorData.message}`);
@@ -140,6 +153,28 @@ const handleSaveTemplate = async (e) => {
     } catch (error) {
         console.error('Save template failed:', error);
         alert('Network error saving template.');
+    }
+};
+
+// --- New Handler: Delete SIG Template ---
+const handleDeleteTemplate = async (templateId) => {
+    if (!window.confirm("Are you sure you want to delete this template?")) return;
+
+    try {
+        const response = await fetch(`${VITE_API_URL}/templates/sig/${templateId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        
+        if (response.ok) {
+            setSigTemplates(sigTemplates.filter(t => t.template_id !== templateId));
+            alert('Template deleted successfully!');
+        } else {
+            const errorData = await response.json();
+            alert(`Delete failed: ${errorData.message}`);
+        }
+    } catch (error) {
+        console.error('Delete failed:', error);
     }
 };
 
@@ -206,29 +241,63 @@ const handleSaveInstructionBlock = async (e) => {
         return;
     }
 
+    const blockId = editingInstructionBlock?.block_id; 
+    const isEditing = !!blockId && typeof blockId === 'number'; 
+    const url = isEditing ? 
+        `${VITE_API_URL}/templates/instruction/${blockId}` : 
+        `${VITE_API_URL}/templates/instruction`;
+    const method = isEditing ? 'PUT' : 'POST';
+
     try {
-        const response = await fetch(`${VITE_API_URL}/templates/instruction`, {
-            method: 'POST',
+        const response = await fetch(url, {
+            method: method,
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
             body: JSON.stringify(newInstructionBlock),
         });
         
         if (response.ok) {
-            const data = await response.json();
-            setInstructionBlocks([...instructionBlocks, { ...newInstructionBlock, block_id: data.blockId }]);
+            // Update the state array
+            const updatedList = isEditing ? 
+                instructionBlocks.map(b => b.block_id === editingInstructionBlock.block_id ? { ...b, ...newInstructionBlock } : b) :
+                [...instructionBlocks, { ...newInstructionBlock, block_id: (await response.json()).blockId }];
+            
+            setInstructionBlocks(updatedList);
             setNewInstructionBlock({ title: '', content: '' }); 
-            alert('Instruction block saved!');
-            setIsInstructionModalOpen(false);
+            setEditingInstructionBlock(null); 
+            alert(`Instruction Block ${isEditing ? 'updated' : 'saved'}!`);
+            setIsInstructionModalOpen(false); 
         } else {
             const errorData = await response.json();
-            alert(`Error saving block: ${errorData.message}`);
+            alert(`Error ${isEditing ? 'updating' : 'saving'} block: ${errorData.message}`);
         }
     } catch (error) {
-        console.error('Save block failed:', error);
+        console.error('Save/Update block failed:', error);
         alert('Network error saving block.');
     }
 };
 
+// --- New Handler: Delete Instruction Block ---
+const handleDeleteInstructionBlock = async (blockId) => {
+    if (!window.confirm("Are you sure you want to delete this Instruction Block?")) return;
+
+    try {
+        const response = await fetch(`${VITE_API_URL}/templates/instruction/${blockId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        
+        if (response.ok) {
+            // Filter the deleted item out of the state array
+            setInstructionBlocks(instructionBlocks.filter(b => b.block_id !== blockId));
+            alert('Instruction Block deleted successfully!');
+        } else {
+            const errorData = await response.json();
+            alert(`Delete failed: ${errorData.message}`);
+        }
+    } catch (error) {
+        console.error('Delete failed:', error);
+    }
+};
 
 // --- Handler to Apply Instruction Block to Advice ---
 const applyInstructionBlock = (content) => {
@@ -512,57 +581,109 @@ const applyInstructionBlock = (content) => {
 
             {/* SIG modal */}
             <Modal 
-                isOpen={isSigModalOpen} 
-                onClose={() => setIsSigModalOpen(false)} 
-                title="Create New SIG Template"
+    isOpen={isSigModalOpen} 
+    onClose={() => { 
+        setIsSigModalOpen(false); 
+        setEditingSigTemplate(null); 
+        
+        setNewTemplate({ title: '', instruction: '' }); 
+    }} 
+    title={editingSigTemplate ? "Edit SIG Template" : "Create New SIG Template"}
+>
+    {/* Management/List View */}
+    {!editingSigTemplate && (
+        <div className="mb-6">
+            <h4 className="text-lg font-medium mb-2">My Saved Templates</h4>
+            <div className="max-h-40 overflow-y-auto space-y-2 border p-2 rounded-md">
+                {sigTemplates.map(template => (
+                    <div key={template.template_id} className="flex justify-between items-center p-2 bg-gray-50 rounded-md">
+                        <span className="text-sm font-medium">{template.title}</span>
+                        <div className="space-x-2">
+                            <button 
+                                type="button" 
+                                onClick={() => { setEditingSigTemplate(template); setNewTemplate(template); }}
+                                className="text-xs text-indigo-600 hover:text-indigo-800"
+                            >
+                                Edit
+                            </button>
+                            <button 
+                                type="button" 
+                                onClick={() => handleDeleteTemplate(template.template_id)}
+                                className="text-xs text-red-600 hover:text-red-800"
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+            <button 
+                type="button" 
+                onClick={() => {
+                    setEditingSigTemplate({ template_id: null }); 
+                    setNewTemplate({ title: '', instruction: '' }); 
+                }}
+                className="mt-4 w-full py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
             >
-                <form onSubmit={handleSaveTemplate} className="flex flex-col gap-4">
-                    <p className="text-sm text-gray-600">Save common dosage instructions for rapid input (e.g., 1+0+1, 7 days).</p>
-                    
-                    {/* Title Input */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Template Title</label>
-                        <input 
-                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                            type="text" 
-                            placeholder="e.g., TID 7 Days" 
-                            value={newTemplate.title} 
-                            onChange={(e) => setNewTemplate({ ...newTemplate, title: e.target.value })}
-                            required
-                        />
-                    </div>
+                + Create New Template
+            </button>
+        </div>
+    )}
 
-                    {/* Instruction Input */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Instruction (SIG)</label>
-                        <input 
-                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                            type="text" 
-                            placeholder="e.g., Take 1 tablet three times a day for 7 days" 
-                            value={newTemplate.instruction} 
-                            onChange={(e) => setNewTemplate({ ...newTemplate, instruction: e.target.value })}
-                            required
-                        />
-                    </div>
+    {/* Create/Edit Form View */}
+    {(editingSigTemplate || !sigTemplates.length) && (
+        <form onSubmit={handleSaveTemplate} className="flex flex-col gap-4 pt-4 border-t">
+            <p className="text-sm text-gray-600">
+                {editingSigTemplate ? 'Modify the selected template.' : 'Create a new template.'}
+            </p>
+            {/* Title Input */}
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Template Title</label>
+                <input 
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                    type="text" 
+                    placeholder="e.g., TID 7 Days" 
+                    value={newTemplate.title} 
+                    onChange={(e) => setNewTemplate({ ...newTemplate, title: e.target.value })}
+                    required
+                />
+            </div>
 
-                    {/* Modal Actions */}
-                    <div className="flex justify-end space-x-3 mt-4">
-                        <button 
-                            type="button"
-                            onClick={() => setIsSigModalOpen(false)}
-                            className="py-2 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button 
-                            type="submit" 
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md text-sm transition-colors shadow-md"
-                        >
-                            Save Template
-                        </button>
-                    </div>
-                </form>
-            </Modal>
+            {/* Instruction Input */}
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Instruction (SIG)</label>
+                <input 
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                    type="text" 
+                    placeholder="e.g., Take 1 tablet three times a day for 7 days" 
+                    value={newTemplate.instruction} 
+                    onChange={(e) => setNewTemplate({ ...newTemplate, instruction: e.target.value })}
+                    required
+                />
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex justify-end space-x-3 mt-4">
+                <button 
+                    type="button"
+                    onClick={() => {
+                        setEditingSigTemplate(null);
+                        setNewTemplate({ title: '', instruction: '' }); 
+                    }}
+                    className="py-2 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                    {editingSigTemplate ? 'Cancel Edit' : 'Cancel'}
+                </button>
+                <button 
+                    type="submit" 
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md text-sm transition-colors shadow-md"
+                >
+                    {editingSigTemplate ? 'Update Template' : 'Save Template'}
+                </button>
+            </div>
+        </form>
+    )}
+</Modal>
 
             {/* 4. Patient Guide/Advice */}
             <fieldset className="p-4 border border-gray-300 rounded-lg mb-8">
@@ -621,56 +742,116 @@ const applyInstructionBlock = (content) => {
 
             <Modal 
                 isOpen={isInstructionModalOpen} 
-                onClose={() => setIsInstructionModalOpen(false)} 
-                title="Create New Instruction Block"
+                onClose={() => { 
+                    // Reset all modal-related states on close
+                    setIsInstructionModalOpen(false); 
+                    setEditingInstructionBlock(null);
+                    setNewInstructionBlock({ title: '', content: '' }); 
+                }} 
+                title={editingInstructionBlock ? "Edit Instruction Block" : "Manage Instruction Blocks"}
             >
-                {/* The Form is now the Children of the Modal */}
-                <form onSubmit={handleSaveInstructionBlock} className="flex flex-col gap-4">
-                    <p className="text-sm text-gray-600">Save a standardized advice template for quick use in future prescriptions.</p>
-                    
-                    {/* Title Input */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Block Title</label>
-                        <input 
-                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-pink-500 focus:border-pink-500"
-                            type="text" 
-                            placeholder="e.g., Dengue Fever Care" 
-                            value={newInstructionBlock.title} 
-                            onChange={(e) => setNewInstructionBlock({ ...newInstructionBlock, title: e.target.value })}
-                            required
-                        />
-                    </div>
-
-                    {/* Content Textarea */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Detailed Content for Patient Handout</label>
-                        <textarea 
-                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-pink-500 focus:border-pink-500"
-                            placeholder="E.g., Rest well, drink plenty of fluids, and avoid NSAIDs like Ibuprofen." 
-                            value={newInstructionBlock.content} 
-                            onChange={(e) => setNewInstructionBlock({ ...newInstructionBlock, content: e.target.value })}
-                            rows="4"
-                            required
-                        />
-                    </div>
-
-                    {/* Modal Actions */}
-                    <div className="flex justify-end space-x-3 mt-4">
+                {/* 1. Management/List View */}
+                {!editingInstructionBlock && (
+                    <div className="mb-6">
+                        <h4 className="text-lg font-medium mb-2">My Saved Blocks</h4>
+                        <div className="max-h-64 overflow-y-auto space-y-2 border p-2 rounded-md">
+                            {instructionBlocks.length === 0 ? (
+                                <p className="text-gray-500 italic text-sm p-2">No custom blocks saved.</p>
+                            ) : (
+                                instructionBlocks.map(block => (
+                                    <div key={block.block_id} className="flex justify-between items-center p-2 bg-gray-50 rounded-md">
+                                        <span className="text-sm font-medium">{block.title}</span>
+                                        <div className="space-x-2">
+                                            <button 
+                                                type="button" 
+                                                onClick={() => { 
+                                                    setEditingInstructionBlock(block); 
+                                                    setNewInstructionBlock(block); // Pre-fill form
+                                                }}
+                                                className="text-xs text-indigo-600 hover:text-indigo-800"
+                                            >
+                                                Edit
+                                            </button>
+                                            <button 
+                                                type="button" 
+                                                onClick={() => handleDeleteInstructionBlock(block.block_id)}
+                                                className="text-xs text-red-600 hover:text-red-800"
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                        {/* Button to switch to Create Form */}
                         <button 
-                            type="button"
-                            onClick={() => setIsInstructionModalOpen(false)}
-                            className="py-2 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                            type="button" 
+                            onClick={() => {
+                                setEditingInstructionBlock({ block_id: null }); // Signal create new
+                                setNewInstructionBlock({ title: '', content: '' }); 
+                            }} 
+                            className="mt-4 w-full py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
                         >
-                            Cancel
-                        </button>
-                        <button 
-                            type="submit" 
-                            className="bg-pink-600 hover:bg-pink-700 text-white font-bold py-2 px-4 rounded-md text-sm transition-colors shadow-md"
-                        >
-                            Save Block
+                            + Create New Block
                         </button>
                     </div>
-                </form>
+                )}
+
+                {/* 2. Create/Edit Form View */}
+                {(editingInstructionBlock || instructionBlocks.length === 0) && (
+                    <form onSubmit={handleSaveInstructionBlock} className="flex flex-col gap-4 pt-4 border-t">
+                        <p className="text-sm text-gray-600">
+                            {editingInstructionBlock ? 'Modify the selected instruction block.' : 'Create a new reusable block.'}
+                        </p>
+                        
+                        {/* Title Input */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Block Title</label>
+                            <input 
+                                className="w-full p-2 border border-gray-300 rounded-md focus:ring-pink-500 focus:border-pink-500"
+                                type="text" 
+                                placeholder="e.g., Dengue Fever Care" 
+                                value={newInstructionBlock.title} 
+                                onChange={(e) => setNewInstructionBlock({ ...newInstructionBlock, title: e.target.value })}
+                                required
+                            />
+                        </div>
+
+                        {/* Content Textarea */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Detailed Content for Patient Handout</label>
+                            <textarea 
+                                className="w-full p-2 border border-gray-300 rounded-md focus:ring-pink-500 focus:border-pink-500"
+                                placeholder="E.g., Rest well, drink plenty of fluids, and avoid NSAIDs like Ibuprofen." 
+                                value={newInstructionBlock.content} 
+                                onChange={(e) => setNewInstructionBlock({ ...newInstructionBlock, content: e.target.value })}
+                                rows="4"
+                                required
+                            />
+                        </div>
+
+                        {/* Modal Actions */}
+                        <div className="flex justify-end space-x-3 mt-4">
+                            <button 
+                                type="button"
+                                onClick={() => {
+                                    setEditingInstructionBlock(null);
+                                    setNewInstructionBlock({ title: '', content: '' }); // <-- ADD THIS
+                                }}
+                                className="py-2 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                            >
+                                {editingInstructionBlock ? 'Cancel Edit' : 'Cancel'}
+                            </button>
+                            <button 
+                                type="submit" 
+                                className="bg-pink-600 hover:bg-pink-700 text-white font-bold py-2 px-4 rounded-md text-sm transition-colors shadow-md"
+                            >
+                                {editingInstructionBlock ? 'Update Block' : 'Save Block'}
+                            </button>
+                        </div>
+                    </form>
+                )}
             </Modal>
         </div>
     );
