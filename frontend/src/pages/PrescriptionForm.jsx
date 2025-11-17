@@ -470,7 +470,7 @@ const applyInstructionBlock = (content) => {
             
             {/* 3.A SIG Templates */}
             <fieldset className="p-4 border border-gray-300 rounded-lg mb-6">
-                <legend className="text-lg font-semibold text-gray-700 px-2">SIG Templates (Dosage Instructions)</legend>
+                <legend className="text-lg font-semibold text-gray-700 px-2">Dosage Instructions</legend>
                 
                 {/* Saved Templates List and Modal Button */}
                 <div className="flex flex-wrap gap-3 mb-4 items-center border-b pb-4 border-gray-200">
@@ -510,9 +510,7 @@ const applyInstructionBlock = (content) => {
                 </div>
             </fieldset>
 
-            {/* ... rest of the PrescriptionForm JSX ... */}
-            
-            {/* --- NEW SIG MODAL COMPONENT --- */}
+            {/* SIG modal */}
             <Modal 
                 isOpen={isSigModalOpen} 
                 onClose={() => setIsSigModalOpen(false)} 
