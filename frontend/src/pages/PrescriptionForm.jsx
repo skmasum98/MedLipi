@@ -18,7 +18,9 @@ function PrescriptionForm() {
     const [isHistoryLoading, setIsHistoryLoading] = useState(false);
     const [prescriptions, setPrescriptions] = useState([]);
     const [interactionWarnings, setInteractionWarnings] = useState([]); 
-    const [diagnosis, setDiagnosis] = useState('');
+    const [diagnosis, setDiagnosis] = useState({ code: '', description: '' });
+    const [diagnosisSearchQuery, setDiagnosisSearchQuery] = useState('');
+    const [diagnosisSearchResults, setDiagnosisSearchResults] = useState([]);
     const [advice, setAdvice] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
@@ -387,6 +389,36 @@ const applyInstructionBlock = (content) => {
     setAdvice(prevAdvice => (prevAdvice ? prevAdvice + '\n\n---\n\n' : '') + content);
 };
 
+// --- New Handler: Search Diagnosis ---
+const handleDiagnosisSearch = async (e) => {
+    const query = e.target.value;
+    setDiagnosisSearchQuery(query);
+    setDiagnosis({ code: query, description: '' }); // Temporarily set code to search text
+
+    if (query.length < 3) return setDiagnosisSearchResults([]);
+
+    try {
+        const response = await fetch(`${VITE_API_URL}/diagnoses/search?q=${query}`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (response.ok) {
+            setDiagnosisSearchResults(await response.json());
+        }
+    } catch (error) {
+        console.error('Diagnosis search failed:', error);
+    }
+};
+
+// --- New Handler: Select Diagnosis Code ---
+const selectDiagnosis = (selectedDiagnosis) => {
+    setDiagnosis({ 
+        code: selectedDiagnosis.code, 
+        description: selectedDiagnosis.description,
+    });
+    setDiagnosisSearchQuery(''); // Clear search box
+    setDiagnosisSearchResults([]); // Clear search results
+};
+
     // --- Submission ---
      const handleSubmit = async (e) => {
         e.preventDefault();
@@ -407,10 +439,10 @@ const applyInstructionBlock = (content) => {
                 generic_name: p.generic_name, 
                 strength: p.strength,
                 // Include counseling points/trade names for the PDF function to save a DB call
-                trade_names: p.trade_names,
+                //  diagnosis_text: diagnosis.description || diagnosis.code, // Send the description or the code
                 counseling_points: p.counseling_points 
             })),
-            diagnosis_text: diagnosis,
+            diagnosis_text: diagnosis.description,
             general_advice: advice,
         };
         
@@ -451,7 +483,7 @@ const applyInstructionBlock = (content) => {
                 // Clear the form after successful generation
                 setPatient({ name: '', age: '', gender: 'Male' });
                 setPrescriptions([]);
-                setDiagnosis('');
+                setDiagnosis({ code: '', description: '' });
                 setAdvice('');
 
             } else {
@@ -834,29 +866,7 @@ const applyInstructionBlock = (content) => {
                         + Create/Manage Blocks
                     </button>
                 </div>
-                
-                {/* Main Advice Textarea */}
-                <textarea 
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="General Advice (Rest, Follow up, etc.) - Content from blocks is appended here." 
-                    value={advice} onChange={(e) => setAdvice(e.target.value)} rows="4"
-                ></textarea>
-                <textarea 
-                    className="w-full p-2 border border-gray-300 rounded-md mb-3 focus:ring-indigo-500 focus:border-indigo-500 mt-4"
-                    placeholder="Diagnosis Text (e.g., Viral Fever, Sinusitis)" 
-                    value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} rows="2"
-                ></textarea>
-            </fieldset>
-            
-            <button 
-                type="submit" 
-                onClick={handleSubmit} 
-                className="w-full py-3 text-xl font-semibold bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors shadow-lg"
-            >
-                Generate Prescription & Guide
-            </button>
-
-            <Modal 
+                <Modal 
                 isOpen={isInstructionModalOpen} 
                 onClose={() => { 
                     // Reset all modal-related states on close
@@ -969,6 +979,77 @@ const applyInstructionBlock = (content) => {
                     </form>
                 )}
             </Modal>
+                
+                {/* Main Advice Textarea */}
+                <textarea 
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="General Advice (Rest, Follow up, etc.) - Content from blocks is appended here." 
+                    value={advice} onChange={(e) => setAdvice(e.target.value)} rows="4"
+                ></textarea>
+
+                
+                {/* Manual diagnosis input as fallback */}
+                    <textarea 
+                        className="w-full p-2 border border-gray-300 rounded-md mt-3 focus:ring-indigo-500 focus:border-indigo-500"
+                        placeholder="Or enter diagnosis manually (e.g., Viral Fever, Sinusitis)" 
+                        value={diagnosis.description} 
+                        onChange={(e) => setDiagnosis({ 
+                            ...diagnosis, 
+                            description: e.target.value 
+                        })} 
+                        rows="2"
+                    ></textarea>
+
+                 {/* --- STRUCTURED DIAGNOSIS INPUT --- */}
+                <div className="mt-4 relative">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Diagnosis Code / Name</label>
+                    
+                    {/* Primary Search/Manual Input */}
+                    <input 
+                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                        type="text"
+                        placeholder="Start typing to search or enter manually (e.g., Fever, J02.9, Sinusitis)" 
+                        value={diagnosisSearchQuery} // <-- Bind the input to the search query
+                        onChange={handleDiagnosisSearch} // <-- Handler updates query AND diagnosis.code
+                    />
+
+                    {/* Display SELECTED/Manual Diagnosis (Confirmation Box) */}
+                    {(diagnosis.code || diagnosis.description) && (
+                        <p className="text-sm mt-2 p-2 bg-indigo-50 border border-indigo-200 rounded-md">
+                            <strong className="text-indigo-700">Selected:</strong> 
+                            {diagnosis.description || diagnosis.code}
+                            {diagnosis.code && ` (Code: ${diagnosis.code})`}
+                        </p>
+                    )}
+
+                    {/* Search Results Dropdown */}
+                    {diagnosisSearchResults.length > 0 && (
+                        <ul className="absolute z-20 w-full bg-white border border-gray-400 rounded-md max-h-52 overflow-y-auto shadow-xl mt-1">
+                            {diagnosisSearchResults.map(d => (
+                                <li 
+                                    key={d.code_id} 
+                                    className="p-3 border-b border-gray-200 cursor-pointer hover:bg-indigo-50 transition-colors"
+                                    onClick={() => selectDiagnosis(d)}
+                                >
+                                    <strong className="font-medium text-gray-800">{d.code}</strong> 
+                                    <span className="text-sm text-gray-500 ml-2">{d.simplified_name || d.description}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+                
+            </fieldset>
+            
+            <button 
+                type="submit" 
+                onClick={handleSubmit} 
+                className="w-full py-3 text-xl font-semibold bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors shadow-lg"
+            >
+                Generate Prescription & Guide
+            </button>
+
+            
         </div>
     );
 }
