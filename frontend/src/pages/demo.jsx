@@ -1,7 +1,8 @@
+// frontend/src/pages/PrescriptionForm.jsx
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth'; 
 
-// Import Sub-Components
+// Import the new Sub-Components
 import PatientPanel from '../components/prescription/PatientPanel';
 import MedicationPanel from '../components/prescription/MedicationPanel';
 import ClinicalNotesPanel from '../components/prescription/ClinicalNotesPanel';
@@ -11,10 +12,7 @@ const VITE_API_URL = import.meta.env.VITE_API_URL;
 function PrescriptionForm() {
     const { token: authToken } = useAuth();
 
-    // --- 1. TAB STATE ---
-    const [activeTab, setActiveTab] = useState('patient'); // Options: 'patient', 'medication', 'notes'
-
-    // --- EXISTING STATES (Keep all your state variables here) ---
+    // --- STATE MANAGEMENT ---
     // Patient
     const [patient, setPatient] = useState({ name: '', age: '', gender: 'Male', id: null });
     const [patientSearchQuery, setPatientSearchQuery] = useState(''); 
@@ -22,21 +20,23 @@ function PrescriptionForm() {
     const [patientHistory, setPatientHistory] = useState([]); 
     const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
-    // Prescription
+    // Prescription / Drugs
     const [prescriptions, setPrescriptions] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [interactionWarnings, setInteractionWarnings] = useState([]); 
 
-    // Notes
+    // Clinical Notes / Diagnosis
     const [diagnosis, setDiagnosis] = useState({ code: '', description: '' });
     const [diagnosisSearchQuery, setDiagnosisSearchQuery] = useState('');
     const [diagnosisSearchResults, setDiagnosisSearchResults] = useState([]);
     const [advice, setAdvice] = useState('');
 
-    // Templates & Modals
+    // Templates (SIG & Instructions)
     const [sigTemplates, setSigTemplates] = useState([]);
     const [instructionBlocks, setInstructionBlocks] = useState([]); 
+    
+    // Modal/Edit States
     const [isSigModalOpen, setIsSigModalOpen] = useState(false); 
     const [isInstructionModalOpen, setIsInstructionModalOpen] = useState(false); 
     const [editingSigTemplate, setEditingSigTemplate] = useState(null); 
@@ -44,9 +44,11 @@ function PrescriptionForm() {
     const [newTemplate, setNewTemplate] = useState({ title: '', instruction: '' });
     const [newInstructionBlock, setNewInstructionBlock] = useState({ title: '', content: '' });
 
-    // --- DATA FETCHING EFFECTS (Keep existing useEffects) ---
+
+    // --- INITIAL DATA FETCHING ---
     useEffect(() => {
         if (!authToken) return;
+        
         const fetchData = async () => {
             try {
                 const [sigRes, instRes] = await Promise.all([
@@ -55,12 +57,14 @@ function PrescriptionForm() {
                 ]);
                 if (sigRes.ok) setSigTemplates(await sigRes.json());
                 if (instRes.ok) setInstructionBlocks(await instRes.json());
-            } catch (error) { console.error('Initial fetch failed:', error); }
+            } catch (error) {
+                console.error('Initial fetch failed:', error);
+            }
         };
         fetchData();
     }, [authToken, VITE_API_URL]);
 
-    // --- INTERACTION CHECKER (Keep existing useEffect) ---
+    // --- INTERACTION CHECKER ---
     useEffect(() => {
         const checkInteractions = async () => {
             if (!authToken || prescriptions.length < 2) return setInteractionWarnings([]);
@@ -81,15 +85,7 @@ function PrescriptionForm() {
     }, [prescriptions, authToken, VITE_API_URL]);
 
 
-    // --- HANDLERS (Keep all your existing handlers) ---
-    // Note: Ensure you have copy-pasted all the handlers (handlePatientSearch, selectPatient, handleRePrescribe, handleSearch, addDrugToPrescription, etc.) 
-    // from your previous code into here. 
-    // For brevity, I am assuming they are present.
-    
-    /* ... PASTE ALL YOUR HANDLERS HERE ... */
-    // (handlePatientSearch, selectPatient, handleRePrescribe, handleSearch, addDrugToPrescription, 
-    // handlePrescriptionItemChange, handleDiagnosisSearch, selectDiagnosis, applyInstructionBlock, 
-       // --- HANDLERS: PATIENT ---
+    // --- HANDLERS: PATIENT ---
     const handlePatientSearch = async (e) => {
         const query = e.target.value;
         setPatientSearchQuery(query);
@@ -163,8 +159,19 @@ function PrescriptionForm() {
 
     const applyInstructionBlock = (content) => setAdvice(prev => (prev ? prev + '\n\n---\n\n' : '') + content);
 
-    // handleSaveTemplate, handleDeleteTemplate, handleSaveInstructionBlock, handleDeleteInstructionBlock, applyTemplate)
-    const handleSaveTemplate = async (e) => {
+    // --- HANDLERS: TEMPLATES (SIG & INSTRUCTION CRUD) ---
+    // (Ideally, these handlers could also be moved to a custom hook 'useTemplates', but we keep here for now)
+    const saveTemplate = async (type, item, editingItem, setList, list, closeModal) => {
+        // Generic save function logic (simplified for brevity in this example)
+        // You can copy the exact handleSaveTemplate logic from your previous code here
+        // For now, I assume you keep the distinct handlers `handleSaveTemplate` and `handleSaveInstructionBlock`
+    };
+    
+    // ... (Copy handleSaveTemplate, handleDeleteTemplate, handleSaveInstructionBlock, handleDeleteInstructionBlock from previous code) ...
+    // ... Just ensure they update the state variables defined at the top of this file ...
+    
+    // Re-declaring logic for clarity in this view:
+const handleSaveTemplate = async (e) => {
     e.preventDefault();
 
 
@@ -298,16 +305,10 @@ const handleDeleteInstructionBlock = async (blockId) => {
 };
 
 
-
-    
-    // --- SUBMISSION HANDLER ---
+    // --- SUBMISSION ---
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!prescriptions.length || !patient.name) { 
-            alert('Please complete the patient details and add medications.'); 
-            setActiveTab('patient'); // Jump to patient tab if missing
-            return; 
-        }
+        if (!prescriptions.length || !patient.name) { alert('Add patient and drugs.'); return; }
         
         const payload = {
             patient: { ...patient, id: patient.id },
@@ -340,106 +341,45 @@ const handleDeleteInstructionBlock = async (blockId) => {
                 alert('Error generating prescription');
             }
         } catch (e) { console.error(e); alert('Network error'); }
-        // ... When resetting form, also reset tab:
-        // setActiveTab('patient');
-    };
-
-    // --- HELPER: TAB CLASS ---
-    const getTabClass = (tabName) => {
-        const baseClass = "flex-1 py-3 text-sm font-medium text-center cursor-pointer transition-colors border-b-2";
-        const activeClass = "border-indigo-600 text-indigo-600 bg-indigo-50";
-        const inactiveClass = "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300";
-        return `${baseClass} ${activeTab === tabName ? activeClass : inactiveClass}`;
     };
 
     return (
-        <div className="max-w-5xl mx-auto p-4 my-8 bg-white rounded-xl shadow-xl min-h-[600px] flex flex-col">
-            <h2 className="text-2xl font-bold text-indigo-700 mb-4 px-2">New Prescription</h2>
+        <div className="max-w-7xl mx-auto p-5 my-8">
+            <h2 className="text-3xl font-bold mb-6 text-indigo-700 border-b pb-2">New Patient Encounter</h2>
             
-            {/* --- TAB NAVIGATION BAR --- */}
-            <div className="flex border-b border-gray-200 mb-6">
-                <div onClick={() => setActiveTab('patient')} className={getTabClass('patient')}>
-                    1. Patient Details
-                </div>
-                <div onClick={() => setActiveTab('medication')} className={getTabClass('medication')}>
-                    2. Medications {prescriptions.length > 0 && `(${prescriptions.length})`}
-                </div>
-                <div onClick={() => setActiveTab('notes')} className={getTabClass('notes')}>
-                    3. Advice & Diagnosis
-                </div>
-            </div>
+            <PatientPanel 
+                patient={patient} setPatient={setPatient}
+                patientSearchQuery={patientSearchQuery} setPatientSearchQuery={setPatientSearchQuery}
+                handlePatientSearch={handlePatientSearch} patientSearchResults={patientSearchResults}
+                selectPatient={selectPatient} patientHistory={patientHistory} isHistoryLoading={isHistoryLoading}
+                handleRePrescribe={handleRePrescribe} handlePatientChange={(e) => setPatient({...patient, [e.target.name]: e.target.value})}
+            />
 
-            {/* --- TAB CONTENT AREA --- */}
-            <div className="flex-1">
-                {/* TAB 1: PATIENT */}
-                {activeTab === 'patient' && (
-                    <div className="animate-fade-in">
-                        <PatientPanel 
-                            patient={patient} setPatient={setPatient}
-                            patientSearchQuery={patientSearchQuery} setPatientSearchQuery={setPatientSearchQuery}
-                            handlePatientSearch={handlePatientSearch} patientSearchResults={patientSearchResults}
-                            selectPatient={selectPatient} patientHistory={patientHistory} isHistoryLoading={isHistoryLoading}
-                            handleRePrescribe={handleRePrescribe} handlePatientChange={(e) => setPatient({...patient, [e.target.name]: e.target.value})}
-                        />
-                        <div className="flex justify-end mt-4">
-                            <button 
-                                onClick={() => setActiveTab('medication')}
-                                className="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700"
-                            >
-                                Next: Add Medicines &rarr;
-                            </button>
-                        </div>
-                    </div>
-                )}
+            <MedicationPanel 
+                searchQuery={searchQuery} handleSearch={handleSearch} searchResults={searchResults} addDrugToPrescription={addDrugToPrescription}
+                prescriptions={prescriptions} handlePrescriptionItemChange={handlePrescriptionItemChange} removePrescriptionItem={(id) => setPrescriptions(prescriptions.filter(p => p.tempId !== id))}
+                interactionWarnings={interactionWarnings}
+                sigTemplates={sigTemplates} applyTemplate={applyTemplate} 
+                setIsSigModalOpen={setIsSigModalOpen} isSigModalOpen={isSigModalOpen}
+                handleSaveTemplate={handleSaveTemplate} handleDeleteTemplate={handleDeleteTemplate}
+                editingSigTemplate={editingSigTemplate} setEditingSigTemplate={setEditingSigTemplate}
+                newTemplate={newTemplate} setNewTemplate={setNewTemplate}
+            />
 
-                {/* TAB 2: MEDICATIONS */}
-                {activeTab === 'medication' && (
-                    <div className="animate-fade-in">
-                        <MedicationPanel 
-                            searchQuery={searchQuery} handleSearch={handleSearch} searchResults={searchResults} addDrugToPrescription={addDrugToPrescription}
-                            prescriptions={prescriptions} handlePrescriptionItemChange={handlePrescriptionItemChange} removePrescriptionItem={(id) => setPrescriptions(prescriptions.filter(p => p.tempId !== id))}
-                            interactionWarnings={interactionWarnings}
-                            sigTemplates={sigTemplates} applyTemplate={applyTemplate} 
-                            setIsSigModalOpen={setIsSigModalOpen} isSigModalOpen={isSigModalOpen}
-                            handleSaveTemplate={handleSaveTemplate} handleDeleteTemplate={handleDeleteTemplate}
-                            editingSigTemplate={editingSigTemplate} setEditingSigTemplate={setEditingSigTemplate}
-                            newTemplate={newTemplate} setNewTemplate={setNewTemplate}
-                        />
-                        <div className="flex justify-between mt-4">
-                            <button onClick={() => setActiveTab('patient')} className="text-gray-600 hover:text-gray-900 px-4 py-2">&larr; Back</button>
-                            <button onClick={() => setActiveTab('notes')} className="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700">Next: Advice &rarr;</button>
-                        </div>
-                    </div>
-                )}
+            <ClinicalNotesPanel 
+                advice={advice} setAdvice={setAdvice}
+                diagnosis={diagnosis} diagnosisSearchQuery={diagnosisSearchQuery} handleDiagnosisSearch={handleDiagnosisSearch}
+                diagnosisSearchResults={diagnosisSearchResults} selectDiagnosis={selectDiagnosis}
+                instructionBlocks={instructionBlocks} applyInstructionBlock={applyInstructionBlock}
+                setIsInstructionModalOpen={setIsInstructionModalOpen} isInstructionModalOpen={isInstructionModalOpen}
+                handleSaveInstructionBlock={handleSaveInstructionBlock} handleDeleteInstructionBlock={handleDeleteInstructionBlock}
+                editingInstructionBlock={editingInstructionBlock} setEditingInstructionBlock={setEditingInstructionBlock}
+                newInstructionBlock={newInstructionBlock} setNewInstructionBlock={setNewInstructionBlock}
+            />
 
-                {/* TAB 3: NOTES & DIAGNOSIS */}
-                {activeTab === 'notes' && (
-                    <div className="animate-fade-in">
-                        <ClinicalNotesPanel 
-                            advice={advice} setAdvice={setAdvice}
-                            diagnosis={diagnosis} diagnosisSearchQuery={diagnosisSearchQuery} handleDiagnosisSearch={handleDiagnosisSearch}
-                            diagnosisSearchResults={diagnosisSearchResults} selectDiagnosis={selectDiagnosis}
-                            instructionBlocks={instructionBlocks} applyInstructionBlock={applyInstructionBlock}
-                            setIsInstructionModalOpen={setIsInstructionModalOpen} isInstructionModalOpen={isInstructionModalOpen}
-                            handleSaveInstructionBlock={handleSaveInstructionBlock} handleDeleteInstructionBlock={handleDeleteInstructionBlock}
-                            editingInstructionBlock={editingInstructionBlock} setEditingInstructionBlock={setEditingInstructionBlock}
-                            newInstructionBlock={newInstructionBlock} setNewInstructionBlock={setNewInstructionBlock}
-                        />
-                        
-                        <div className="flex justify-between mt-6 pt-4 border-t border-gray-100">
-                            <button onClick={() => setActiveTab('medication')} className="text-gray-600 hover:text-gray-900 px-4 py-2">&larr; Back</button>
-                            
-                            {/* FINAL SUBMIT BUTTON */}
-                            <button 
-                                onClick={handleSubmit} 
-                                className="bg-green-600 hover:bg-green-700 text-white font-bold text-lg px-8 py-3 rounded-md shadow-lg transition-transform transform hover:scale-105"
-                            >
-                                Generate Prescription (PDF)
-                            </button>
-                        </div>
-                    </div>
-                )}
-            </div>
+            <button onClick={handleSubmit} className="w-full py-3 text-xl font-semibold bg-green-600 hover:bg-green-700 text-white rounded-md shadow-lg transition-colors">
+                Generate Prescription & Guide
+            </button>
         </div>
     );
 }
