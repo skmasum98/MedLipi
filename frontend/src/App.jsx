@@ -8,6 +8,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import PrescriptionForm from './pages/PrescriptionForm';
 import Dashboard from './pages/Dashboard';
+import Settings from './pages/Settings';
 
 // --- Simple Component to show Doctor info and Logout ---
 function DoctorProfile() {
@@ -48,13 +49,11 @@ function App() {
                         />
                         
                     
-                    {/* All protected routes are wrapped in the ProtectedRoute component */}
-                    <Route 
-                        path="/profile" 
-                        element={<ProtectedRoute><DoctorProfile /></ProtectedRoute>} 
-                    />
+                    
                                         
                     <Route path="*" element={<HomeRedirect />} />
+
+                    <Route path="/profile" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 </Routes>
                 </main>
             </AuthProvider>

@@ -81,11 +81,17 @@ router.post('/', async (req, res) => {
         }
 
         await connection.commit();
+
+         const [docRows] = await pool.query(
+            'SELECT full_name, bmdc_reg, email, degree, clinic_name, chamber_address, phone_number, specialist_title FROM doctors WHERE doctor_id = ?', 
+            [doctorId]
+        );
+        const doctorDetails = docRows[0];
         
         // 3. Immediately trigger PDF generation (Step 6.3)
         // Pass essential IDs and data to the PDF function
         generatePrescriptionPDF(res, {
-            doctor: req.doctor, // from JWT payload
+            doctor: doctorDetails, 
             patient: { id: patientId, ...patient },
             prescriptions,
             diagnosis_text,
@@ -114,15 +120,35 @@ const generatePrescriptionPDF = (res, data) => {
     // --- Template Design ---
 
     // 1. Header (Doctor Info - Top Right)
-    doc.fontSize(10).text(`Dr. ${data.doctor.name}`, 400, 60, { align: 'right' });
-    doc.text(`${data.doctor.bmdc}`, { align: 'right' });
-    doc.text(`Email: ${data.doctor.email}`, { align: 'right' });
-    doc.moveDown();
+    // Clinic Name (Left Aligned, Large)
+    if (data.doctor.clinic_name) {
+        doc.fontSize(20).fillColor('#2c3e50').text(data.doctor.clinic_name, 50, 50);
+        doc.fontSize(10).fillColor('#555').text(data.doctor.chamber_address || '', 50, 75);
+        doc.text(`Appt: ${data.doctor.phone_number || ''}`, 50, 90);
+    }
+
+    // Doctor Details (Right Aligned)
+    const startX = 350;
+    doc.fontSize(14).fillColor('#000').text(`Dr. ${data.doctor.full_name}`, startX, 50, { align: 'right' });
+    doc.fontSize(10).fillColor('#333').text(data.doctor.degree || '', startX, 70, { align: 'right' });
+    doc.fontSize(9).fillColor('#666').text(data.doctor.specialist_title || '', startX, 85, { align: 'right' });
+    doc.text(`BMDC Reg: ${data.doctor.bmdc_reg}`, startX, 100, { align: 'right' });
+
+    // Divider Line
+    doc.moveDown(2);
+    doc.lineWidth(2).strokeColor('#2c3e50').moveTo(50, 120).lineTo(550, 120).stroke();
 
     // 2. Patient Info (Top Left)
-    doc.fontSize(12).fillColor('#333').text(`Patient: ${data.patient.name}`, 50, 100);
-    doc.text(`Age/Gender: ${data.patient.age || 'N/A'} / ${data.patient.gender}`);
-    doc.moveDown();
+    // Reset Y position to below the line
+    doc.y = 130; 
+    
+    doc.fontSize(11).fillColor('#000');
+    doc.text(`Name: ${data.patient.name}`, 50, 130);
+    doc.text(`Age: ${data.patient.age || '--'}   Gender: ${data.patient.gender}`, 350, 130, { align: 'right' });
+    
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 50, 145);
+    
+    doc.moveDown(2); // Add space before Rx
     
     // 3. Diagnosis (If provided)
     if (data.diagnosis_text) {
