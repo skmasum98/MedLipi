@@ -7,6 +7,7 @@ import Header from './components/Header';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import PrescriptionForm from './pages/PrescriptionForm';
+import Dashboard from './pages/Dashboard';
 
 // --- Simple Component to show Doctor info and Logout ---
 function DoctorProfile() {
@@ -34,17 +35,25 @@ function App() {
                     <Route path="/register" element={<Register />} />
                     {/* Login component uses the login function from context */}
                     <Route path="/login" element={<Login />} /> 
+                    {/* --- DASHBOARD ROUTE (Home Base) --- */}
+                        <Route 
+                            path="/dashboard" 
+                            element={<ProtectedRoute><Dashboard /></ProtectedRoute>} 
+                        />
+
+                        {/* --- PRESCRIPTION FORM ROUTE --- */}
+                        <Route 
+                            path="/prescription/new" 
+                            element={<ProtectedRoute><PrescriptionForm /></ProtectedRoute>} 
+                        />
+                        
                     
                     {/* All protected routes are wrapped in the ProtectedRoute component */}
                     <Route 
                         path="/profile" 
                         element={<ProtectedRoute><DoctorProfile /></ProtectedRoute>} 
                     />
-                    <Route 
-                        path="/dashboard" 
-                        element={<ProtectedRoute><PrescriptionForm /></ProtectedRoute>} 
-                    />
-                    
+                                        
                     <Route path="*" element={<HomeRedirect />} />
                 </Routes>
                 </main>

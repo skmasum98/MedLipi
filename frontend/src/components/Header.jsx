@@ -36,7 +36,8 @@ function Header() {
                         {/* Protected Links (for authenticated doctors) */}
                         {isAuthenticated && (
                             <>
-                                <Link to="/dashboard" className={linkClasses}>New Prescription</Link>
+                                <Link to="/dashboard" className={linkClasses}>Dashboard</Link>
+                                <Link to="/prescription/new" className={linkClasses}>+ New Prescription</Link>
                                 <Link to="/profile" className={linkClasses}>{doctorName}</Link>
                                 
                                 {/* Logout Button */}

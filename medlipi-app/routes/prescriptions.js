@@ -7,6 +7,37 @@ import verifyToken from '../middleware/auth.js';
 const router = express.Router();
 router.use(verifyToken); // All routes in this file are protected
 
+
+// --- GET Recent Patient Visits (/api/prescriptions/recent) ---
+router.get('/recent', async (req, res) => {
+    const doctorId = req.doctor.id;
+    try {
+        // Group by patient and timestamp to find unique "visits"
+        // We select the MAX(created_at) to get the latest time for that patient
+        const query = `
+            SELECT 
+                p.patient_id, 
+                pt.name, 
+                pt.age, 
+                pt.gender, 
+                MAX(p.created_at) as visit_date,
+                MAX(p.diagnosis_text) as diagnosis -- Just pick one diagnosis from the batch
+            FROM prescriptions p
+            JOIN patients pt ON p.patient_id = pt.patient_id
+            WHERE p.doctor_id = ?
+            GROUP BY p.patient_id, pt.name, pt.age, pt.gender, DATE(p.created_at) 
+            ORDER BY visit_date DESC
+            LIMIT 10
+        `;
+        
+        const [recent] = await pool.query(query, [doctorId]);
+        res.json(recent);
+    } catch (error) {
+        console.error('Error fetching recent prescriptions:', error);
+        res.status(500).json({ message: 'Server error fetching recent activity.' });
+    }
+});
+
 // --- POST Create New Prescription (/api/prescriptions) ---
 router.post('/', async (req, res) => {
     const { patient, prescriptions, diagnosis_text, general_advice } = req.body;
