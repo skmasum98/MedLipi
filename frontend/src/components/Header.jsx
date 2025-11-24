@@ -19,7 +19,7 @@ function Header() {
                     {/* Logo/App Name */}
                     <div className="shrink-0">
                         <Link to="/" className="text-2xl font-extrabold text-white tracking-wider">
-                            MedLipi
+                            <img className='max-w-xs max-h-20 shadow-amber-50 rounded-md' src="/logo.png" alt="MedLipi Logo" />
                         </Link>
                     </div>
 
