@@ -9,6 +9,7 @@ import Register from './pages/Register';
 import PrescriptionForm from './pages/PrescriptionForm';
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
+import Inventory from './pages/Inventory';
 
 // --- Simple Component to show Doctor info and Logout ---
 function DoctorProfile() {
@@ -49,7 +50,7 @@ function App() {
                         />
                         
                     
-                    
+                    <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
                                         
                     <Route path="*" element={<HomeRedirect />} />
 

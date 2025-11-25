@@ -38,6 +38,7 @@ function Header() {
                             <>
                                 <Link to="/dashboard" className={linkClasses}>Dashboard</Link>
                                 <Link to="/prescription/new" className={linkClasses}>+ New Prescription</Link>
+                                <Link to="/inventory" className={linkClasses}>Drugs DB</Link>
                                 <Link to="/profile" className={linkClasses}>{doctorName}</Link>
                                 
                                 {/* Logout Button */}
