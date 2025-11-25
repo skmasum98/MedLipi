@@ -10,6 +10,8 @@ import PrescriptionForm from './pages/PrescriptionForm';
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
 import Inventory from './pages/Inventory';
+import Patients from './pages/Patients';
+import PatientRecord from './pages/PatientRecord';
 
 // --- Simple Component to show Doctor info and Logout ---
 function DoctorProfile() {
@@ -55,6 +57,8 @@ function App() {
                     <Route path="*" element={<HomeRedirect />} />
 
                     <Route path="/profile" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                    <Route path="/patients" element={<ProtectedRoute><Patients /></ProtectedRoute>} />
+                    <Route path="/patients/:id" element={<ProtectedRoute><PatientRecord /></ProtectedRoute>} />
                 </Routes>
                 </main>
             </AuthProvider>
