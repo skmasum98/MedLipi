@@ -14,6 +14,7 @@ import templateRoutes from './routes/templates.js';
 import patientRoutes from './routes/patients.js';
 import interactionRoutes from './routes/interactions.js'; 
 import diagnosisRoutes from './routes/diagnoses.js';
+import analyticsRoutes from './routes/analytics.js';
 
 // Initialize Express App
 const app = express();
@@ -38,6 +39,7 @@ app.use('/api/templates', templateRoutes);
 app.use('/api/patients', patientRoutes);
 app.use('/api/interactions', interactionRoutes);
 app.use('/api/diagnoses', diagnosisRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 
 // Start Server

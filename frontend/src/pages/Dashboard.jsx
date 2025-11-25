@@ -1,137 +1,143 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router';
 import { useAuth } from '../hooks/useAuth';
+// Import Recharts components
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 
 const VITE_API_URL = import.meta.env.VITE_API_URL;
 
 function Dashboard() {
     const { doctor, token } = useAuth();
+    
+    // States
     const [recentVisits, setRecentVisits] = useState([]);
+    const [summary, setSummary] = useState({ total_prescriptions: 0, today_prescriptions: 0, total_unique_patients: 0 });
+    const [activityData, setActivityData] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // Fetch Recent Activity
     useEffect(() => {
-        const fetchRecent = async () => {
+        const loadDashboardData = async () => {
             try {
-                const response = await fetch(`${VITE_API_URL}/prescriptions/recent`, {
+                // Fetch Recent List
+                const recentRes = await fetch(`${VITE_API_URL}/prescriptions/recent`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                if (response.ok) {
-                    setRecentVisits(await response.json());
-                }
+                if (recentRes.ok) setRecentVisits(await recentRes.json());
+
+                // Fetch Summary Stats
+                const summaryRes = await fetch(`${VITE_API_URL}/analytics/summary`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (summaryRes.ok) setSummary(await summaryRes.json());
+
+                // Fetch Activity Graph
+                const activityRes = await fetch(`${VITE_API_URL}/analytics/activity`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (activityRes.ok) setActivityData(await activityRes.json());
+
             } catch (error) {
                 console.error('Error loading dashboard:', error);
             } finally {
                 setLoading(false);
             }
         };
-        fetchRecent();
-    }, [token]);
+        loadDashboardData();
+    }, [token, VITE_API_URL]);
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            {/* 1. Welcome Section */}
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900">
-                    Welcome, Dr. {doctor?.full_name?.split(' ')[0]}
-                </h1>
-                <p className="mt-1 text-sm text-gray-500">
-                    Here is what's happening in your practice today.
-                </p>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-gray-50 min-h-screen">
+            
+            {/* Header */}
+            <div className="flex justify-between items-end mb-8">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900">
+                        Overview
+                    </h1>
+                    <p className="mt-1 text-sm text-gray-500">
+                        Welcome back, Dr. {doctor?.full_name?.split(' ')[0]}
+                    </p>
+                </div>
+                <Link to="/prescription/new" className="bg-indigo-600 text-white px-5 py-2 rounded-lg shadow hover:bg-indigo-700 transition font-medium">
+                    + New Prescription
+                </Link>
             </div>
 
-            {/* 2. Quick Actions & Stats Grid */}
+            {/* 1. Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                
-                {/* Card 1: Create New (Action) */}
-                <div className="bg-linear-to-br from-indigo-600 to-indigo-700 rounded-xl shadow-lg text-white overflow-hidden transform transition hover:scale-105 duration-200">
-                    <div className="p-6">
-                        <h3 className="text-xl font-bold mb-2">New Consultation</h3>
-                        <p className="text-indigo-100 mb-6 text-sm">Start a new patient encounter, write prescriptions, and print guides.</p>
-                        <Link to="/prescription/new" className="block w-full text-center bg-white text-indigo-600 font-bold py-3 rounded-lg shadow hover:bg-gray-50 transition">
-                            + Create Prescription
-                        </Link>
-                    </div>
+                {/* Card 1 */}
+                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                    <p className="text-xs font-semibold text-indigo-500 uppercase tracking-wide">Today's Patients</p>
+                    <h3 className="text-3xl font-extrabold text-gray-900 mt-2">{summary.today_prescriptions}</h3>
                 </div>
-
-                {/* Card 2: Recent Count */}
-                <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100 flex flex-col justify-between">
-                    <div>
-                        <p className="text-gray-500 text-sm font-medium uppercase tracking-wide">Recent Patients</p>
-                        <h3 className="text-4xl font-extrabold text-gray-900 mt-2">{recentVisits.length}</h3>
-                    </div>
-                    <div className="mt-4 text-sm text-gray-500">
-                        Shown in history below
-                    </div>
+                {/* Card 2 */}
+                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                    <p className="text-xs font-semibold text-green-500 uppercase tracking-wide">Total Prescriptions</p>
+                    <h3 className="text-3xl font-extrabold text-gray-900 mt-2">{summary.total_prescriptions}</h3>
                 </div>
-
-                {/* Card 3: Profile / Info */}
-                <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100 flex flex-col justify-between">
-                    <div>
-                        <p className="text-gray-500 text-sm font-medium uppercase tracking-wide">Doctor Profile</p>
-                        <div className="mt-3">
-                            <p className="font-semibold text-gray-800">{doctor?.full_name}</p>
-                            <p className="text-sm text-gray-600">{doctor?.degree}</p>
-                            <p className="text-xs text-gray-400 mt-1">BMDC: {doctor?.bmdc_reg}</p>
-                        </div>
-                    </div>
-                    <Link to="/profile" className="mt-4 text-indigo-600 hover:text-indigo-800 text-sm font-medium">
-                        View Profile &rarr;
-                    </Link>
+                {/* Card 3 */}
+                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                    <p className="text-xs font-semibold text-purple-500 uppercase tracking-wide">Unique Patients</p>
+                    <h3 className="text-3xl font-extrabold text-gray-900 mt-2">{summary.total_unique_patients}</h3>
                 </div>
             </div>
 
-            {/* 3. Recent Activity Table */}
-            <div className="bg-white shadow-md rounded-lg overflow-hidden border border-gray-200">
-                <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                    <h3 className="text-lg font-medium text-gray-900">Recent Patient Visits</h3>
-                </div>
+            {/* 2. Analytics & Recent Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 
-                {loading ? (
-                    <div className="p-6 text-center text-gray-500">Loading recent activity...</div>
-                ) : recentVisits.length === 0 ? (
-                    <div className="p-10 text-center text-gray-500">
-                        <p>No prescriptions created yet.</p>
-                        <Link to="/prescription/new" className="text-indigo-600 hover:underline mt-2 block">Start your first one!</Link>
+                {/* Left Column: Chart (Takes 2 columns) */}
+                <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <h3 className="text-lg font-bold text-gray-800 mb-4">Patient Activity (Last 7 Days)</h3>
+                    <div className="h-64 w-full">
+                        {activityData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={activityData}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#6b7280'}} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#6b7280'}} allowDecimals={false} />
+                                    <Tooltip 
+                                        cursor={{fill: '#f3f4f6'}}
+                                        contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'}}
+                                    />
+                                    <Bar dataKey="patients" fill="#4f46e5" radius={[4, 4, 0, 0]} barSize={40} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+                                Not enough data for chart
+                            </div>
+                        )}
                     </div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient Name</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Age/Gender</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Diagnosis</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
+                </div>
+
+                {/* Right Column: Recent List (Takes 1 column) */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+                    <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                        <h3 className="text-md font-bold text-gray-800">Recent Visits</h3>
+                        <Link to="/inventory" className="text-xs text-indigo-600 hover:underline">Manage Drugs</Link>
+                    </div>
+                    <div className="flex-1 overflow-y-auto max-h-[350px]">
+                        {loading ? (
+                            <p className="p-4 text-center text-gray-500 text-sm">Loading...</p>
+                        ) : recentVisits.length === 0 ? (
+                            <p className="p-6 text-center text-gray-500 text-sm">No recent activity.</p>
+                        ) : (
+                            <ul className="divide-y divide-gray-100">
                                 {recentVisits.map((visit, index) => (
-                                    <tr key={index} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {new Date(visit.visit_date).toLocaleDateString()}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                            {visit.name}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {visit.age} Y / {visit.gender}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {visit.diagnosis || 'N/A'}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                                Completed
-                                            </span>
-                                        </td>
-                                    </tr>
+                                    <li key={index} className="p-4 hover:bg-gray-50 transition">
+                                        <div className="flex justify-between">
+                                            <p className="text-sm font-semibold text-gray-900">{visit.name}</p>
+                                            <p className="text-xs text-gray-500">{new Date(visit.visit_date).toLocaleDateString()}</p>
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            {visit.diagnosis || 'No diagnosis'}
+                                        </p>
+                                    </li>
                                 ))}
-                            </tbody>
-                        </table>
+                            </ul>
+                        )}
                     </div>
-                )}
+                </div>
             </div>
         </div>
     );
