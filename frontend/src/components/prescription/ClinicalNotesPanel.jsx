@@ -5,8 +5,7 @@ import Modal from '../Modal';
 function ClinicalNotesPanel({
     // Advice Props
     advice, setAdvice,
-    // Diagnosis Props
-    diagnosis, diagnosisSearchQuery, handleDiagnosisSearch, diagnosisSearchResults, selectDiagnosis,
+    
     // Instruction Block Props
     instructionBlocks, applyInstructionBlock, setIsInstructionModalOpen,
     // Modal Props
@@ -37,7 +36,7 @@ function ClinicalNotesPanel({
             ></textarea>
 
             {/* 3. Structured Diagnosis */}
-            <div className="relative">
+            {/* <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Diagnosis</label>
                 <input className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                     type="text" placeholder="Search or Type Diagnosis..." value={diagnosisSearchQuery} onChange={handleDiagnosisSearch}
@@ -56,7 +55,7 @@ function ClinicalNotesPanel({
                         ))}
                     </ul>
                 )}
-            </div>
+            </div> */}
 
             {/* Instruction Modal (Simplified View for Brevity - Logic matches parent) */}
             <Modal isOpen={isInstructionModalOpen} onClose={() => { setIsInstructionModalOpen(false); setEditingInstructionBlock(null); setNewInstructionBlock({ title: '', content: '' }); }} 

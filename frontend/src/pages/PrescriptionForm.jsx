@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import PatientPanel from '../components/prescription/PatientPanel';
 import MedicationPanel from '../components/prescription/MedicationPanel';
 import ClinicalNotesPanel from '../components/prescription/ClinicalNotesPanel';
+import AssessmentPanel from '../components/prescription/AssessmentPanel';
 
 const VITE_API_URL = import.meta.env.VITE_API_URL;
 
@@ -55,6 +56,16 @@ function PrescriptionForm() {
     const [editingInstructionBlock, setEditingInstructionBlock] = useState(null); 
     const [newTemplate, setNewTemplate] = useState({ title: '', instruction: '' });
     const [newInstructionBlock, setNewInstructionBlock] = useState({ title: '', content: '' });
+     // 1. NEW STATES
+    const [chiefComplaint, setChiefComplaint] = useState('');
+    const [history, setHistory] = useState(''); // Medical/Treatment history merged for UI, can split if needed
+    const [investigations, setInvestigations] = useState('');
+    const [followUp, setFollowUp] = useState('');
+    
+    // Exam State (JSON Object)
+    const [exam, setExam] = useState({
+        bp: '', pulse: '', temp: '', weight: '', height: '', bmi: '', spo2: '', other: ''
+    });
 
     // --- DATA FETCHING EFFECTS (Keep existing useEffects) ---
     useEffect(() => {
@@ -427,8 +438,13 @@ const handleDeleteInstructionBlock = async (blockId) => {
                 strength: p.strength, 
                 counseling_points: p.counseling_points
             })),
+            chief_complaint: chiefComplaint,
+            medical_history: history,
+            examination_findings: exam, // Object
+            investigations: investigations,
             diagnosis_text: diagnosis.description || diagnosis.code,
             general_advice: advice,
+            follow_up_date: followUp
         };
 
         try {
@@ -451,6 +467,11 @@ const handleDeleteInstructionBlock = async (blockId) => {
                 setDiagnosis({ code: '', description: '' });
                 setAdvice('');
                 setDiagnosisSearchQuery('');
+                setChiefComplaint('');
+                setHistory('');
+                setInvestigations('');
+                setFollowUp('');
+                setExam({ bp: '', pulse: '', temp: '', weight: '', height: '', bmi: '', spo2: '', other: '' });
             } else {
                 alert('Error generating prescription');
             }
@@ -472,16 +493,11 @@ const handleDeleteInstructionBlock = async (blockId) => {
             <h2 className="text-2xl font-bold text-indigo-700 mb-4 px-2">New Prescription</h2>
             
             {/* --- TAB NAVIGATION BAR --- */}
-            <div className="flex border-b border-gray-200 mb-6">
-                <div onClick={() => setActiveTab('patient')} className={getTabClass('patient')}>
-                    1. Patient Details
-                </div>
-                <div onClick={() => setActiveTab('medication')} className={getTabClass('medication')}>
-                    2. Medications {prescriptions.length > 0 && `(${prescriptions.length})`}
-                </div>
-                <div onClick={() => setActiveTab('notes')} className={getTabClass('notes')}>
-                    3. Advice & Diagnosis
-                </div>
+            <div className="flex border-b border-gray-200 mb-6 overflow-x-auto">
+                <div onClick={() => setActiveTab('patient')} className={getTabClass('patient')}>1. Patient</div>
+                <div onClick={() => setActiveTab('assessment')} className={getTabClass('assessment')}>2. Assessment</div>
+                <div onClick={() => setActiveTab('medication')} className={getTabClass('medication')}>3. Medicine</div>
+                <div onClick={() => setActiveTab('notes')} className={getTabClass('notes')}>4. Advice</div>
             </div>
 
             {/* --- TAB CONTENT AREA --- */}
@@ -497,17 +513,33 @@ const handleDeleteInstructionBlock = async (blockId) => {
                             handleRePrescribe={handleRePrescribe} handlePatientChange={(e) => setPatient({...patient, [e.target.name]: e.target.value})}
                         />
                         <div className="flex justify-end mt-4">
-                            <button 
-                                onClick={() => setActiveTab('medication')}
-                                className="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700"
-                            >
-                                Next: Add Medicines &rarr;
+                            <button onClick={() => setActiveTab('assessment')} className="bg-indigo-600 text-white px-6 py-2 rounded-md">
+                                Next: Assessment &rarr;
                             </button>
                         </div>
                     </div>
                 )}
 
-                {/* TAB 2: MEDICATIONS */}
+                {/* TAB 2: ASSESSMENT (NEW) */}
+                {activeTab === 'assessment' && (
+                    <div className="animate-fade-in">
+                        <AssessmentPanel 
+                            chiefComplaint={chiefComplaint} setChiefComplaint={setChiefComplaint}
+                            history={history} setHistory={setHistory}
+                            investigations={investigations} setInvestigations={setInvestigations}
+                            exam={exam} setExam={setExam}
+                            diagnosis={diagnosis} diagnosisSearchQuery={diagnosisSearchQuery}
+                            handleDiagnosisSearch={handleDiagnosisSearch} diagnosisSearchResults={diagnosisSearchResults}
+                            selectDiagnosis={selectDiagnosis}
+                        />
+                        <div className="flex justify-between mt-4">
+                            <button onClick={() => setActiveTab('patient')} className="text-gray-600 px-4 py-2">&larr; Back</button>
+                            <button onClick={() => setActiveTab('medication')} className="bg-indigo-600 text-white px-6 py-2 rounded-md">Next: Medicines &rarr;</button>
+                        </div>
+                    </div>
+                )}
+
+                {/* TAB 3: MEDICATIONS */}
                 {activeTab === 'medication' && (
                     <div className="animate-fade-in">
                         <MedicationPanel 
@@ -521,35 +553,37 @@ const handleDeleteInstructionBlock = async (blockId) => {
                             newTemplate={newTemplate} setNewTemplate={setNewTemplate}
                         />
                         <div className="flex justify-between mt-4">
-                            <button onClick={() => setActiveTab('patient')} className="text-gray-600 hover:text-gray-900 px-4 py-2">&larr; Back</button>
-                            <button onClick={() => setActiveTab('notes')} className="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700">Next: Advice &rarr;</button>
+                            <button onClick={() => setActiveTab('assessment')} className="text-gray-600 px-4 py-2">&larr; Back</button>
+                            <button onClick={() => setActiveTab('notes')} className="bg-indigo-600 text-white px-6 py-2 rounded-md">Next: Advice &rarr;</button>
                         </div>
                     </div>
                 )}
 
-                {/* TAB 3: NOTES & DIAGNOSIS */}
+                {/* TAB 4: NOTES & DIAGNOSIS */}
                 {activeTab === 'notes' && (
                     <div className="animate-fade-in">
                         <ClinicalNotesPanel 
                             advice={advice} setAdvice={setAdvice}
-                            diagnosis={diagnosis} diagnosisSearchQuery={diagnosisSearchQuery} handleDiagnosisSearch={handleDiagnosisSearch}
-                            diagnosisSearchResults={diagnosisSearchResults} selectDiagnosis={selectDiagnosis}
                             instructionBlocks={instructionBlocks} applyInstructionBlock={applyInstructionBlock}
                             setIsInstructionModalOpen={setIsInstructionModalOpen} isInstructionModalOpen={isInstructionModalOpen}
                             handleSaveInstructionBlock={handleSaveInstructionBlock} handleDeleteInstructionBlock={handleDeleteInstructionBlock}
                             editingInstructionBlock={editingInstructionBlock} setEditingInstructionBlock={setEditingInstructionBlock}
                             newInstructionBlock={newInstructionBlock} setNewInstructionBlock={setNewInstructionBlock}
                         />
+
+                        <div className="mt-4 bg-white p-4 rounded border border-gray-300">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Follow-up Instructions</label>
+                            <input 
+                                className="w-full p-2 border border-gray-300 rounded-md" 
+                                type="text" placeholder="e.g. After 7 days / When needed" 
+                                value={followUp} onChange={(e) => setFollowUp(e.target.value)} 
+                            />
+                        </div>
                         
-                        <div className="flex justify-between mt-6 pt-4 border-t border-gray-100">
-                            <button onClick={() => setActiveTab('medication')} className="text-gray-600 hover:text-gray-900 px-4 py-2">&larr; Back</button>
-                            
-                            {/* FINAL SUBMIT BUTTON */}
-                            <button 
-                                onClick={handleSubmit} 
-                                className="bg-green-600 hover:bg-green-700 text-white font-bold text-lg px-8 py-3 rounded-md shadow-lg transition-transform transform hover:scale-105"
-                            >
-                                Generate Prescription (PDF)
+                        <div className="flex justify-between mt-6 pt-4">
+                            <button onClick={() => setActiveTab('medication')} className="text-gray-600 px-4 py-2">&larr; Back</button>
+                            <button onClick={handleSubmit} className="bg-green-600 text-white font-bold text-lg px-8 py-3 rounded-md shadow-lg">
+                                Generate Prescription
                             </button>
                         </div>
                     </div>

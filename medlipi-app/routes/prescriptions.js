@@ -40,7 +40,17 @@ router.get('/recent', async (req, res) => {
 
 // --- POST Create New Prescription (/api/prescriptions) ---
 router.post('/', async (req, res) => {
-    const { patient, prescriptions, diagnosis_text, general_advice } = req.body;
+    const { 
+        patient, 
+        prescriptions, 
+        diagnosis_text, 
+        general_advice, 
+        chief_complaint, 
+        medical_history, 
+        examination_findings, 
+        investigations, 
+        follow_up_date 
+    } = req.body;
     const doctorId = req.doctor.id; 
     let connection;
 
@@ -87,21 +97,36 @@ router.post('/', async (req, res) => {
         for (const drug of prescriptions) {
             const prescriptionQuery = `
                 INSERT INTO prescriptions 
-                (doctor_id, patient_id, drug_id, quantity, sig_instruction, duration, diagnosis_text, general_advice)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (doctor_id, patient_id, 
+                drug_id, quantity, sig_instruction, 
+                duration, diagnosis_text, general_advice,
+                chief_complaint, medical_history, examination_findings, investigations, follow_up_date
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
-            const prescriptionValues = [
-                doctorId, 
-                patientId, 
-                drug.drug_id, 
-                drug.quantity, 
-                drug.sig_instruction, 
-                drug.duration,
-                // Only save the diagnosis/advice once with the first drug (or we can update the schema to separate this)
-                diagnosis_text, 
-                general_advice
-            ];
-            await connection.query(prescriptionQuery, prescriptionValues);
+
+            const examString = typeof examination_findings === 'object' 
+                ? JSON.stringify(examination_findings) 
+                : examination_findings;
+
+            const values = [
+                doctorId, patientId, drug.drug_id, drug.quantity, drug.sig_instruction, drug.duration,
+                diagnosis_text, general_advice,
+                chief_complaint, medical_history, examString, investigations, follow_up_date
+            ];            
+
+            // const prescriptionValues = [
+            //     doctorId, 
+            //     patientId, 
+            //     drug.drug_id, 
+            //     drug.quantity, 
+            //     drug.sig_instruction, 
+            //     drug.duration,
+            //     // Only save the diagnosis/advice once with the first drug (or we can update the schema to separate this)
+            //     diagnosis_text, 
+            //     general_advice
+            // ];
+            await connection.query(prescriptionQuery, values);
         }
 
         await connection.commit();
@@ -120,6 +145,11 @@ router.post('/', async (req, res) => {
             prescriptions,
             diagnosis_text,
             general_advice,
+            chief_complaint,
+            medical_history,
+            examination_findings: typeof examination_findings === 'object' ? examination_findings : JSON.parse(examination_findings || '{}'),
+            investigations,
+            follow_up_date
         });
 
     } catch (error) {
@@ -133,96 +163,152 @@ router.post('/', async (req, res) => {
 
 // --- PDF Generation Function (The magic happens here) ---
 const generatePrescriptionPDF = (res, data) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 50 });
+    const doc = new PDFDocument({ size: 'A4', margin: 40 }); // Reduced margin
     
-    // Set headers for file download
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="Prescription_${data.patient.name.replace(/\s/g, '_')}_${Date.now()}.pdf"`);
-    
-    doc.pipe(res); // Pipe the PDF directly to the HTTP response
+    res.setHeader('Content-Disposition', `attachment; filename="Prescription_${data.patient.name}.pdf"`);
+    doc.pipe(res);
 
-    // --- Template Design ---
-
-    // 1. Header (Doctor Info - Top Right)
-    // Clinic Name (Left Aligned, Large)
+    // --- HEADER (Clinic & Doctor) ---
+    // ... (Keep your existing Header Logic from Step 22) ...
     if (data.doctor.clinic_name) {
-        doc.fontSize(20).fillColor('#2c3e50').text(data.doctor.clinic_name, 50, 50);
-        doc.fontSize(10).fillColor('#555').text(data.doctor.chamber_address || '', 50, 75);
-        doc.text(`Appt: ${data.doctor.phone_number || ''}`, 50, 90);
+        doc.fontSize(20).fillColor('#2c3e50').text(data.doctor.clinic_name, 40, 40);
+        doc.fontSize(10).fillColor('#555').text(data.doctor.chamber_address || '', 40, 65);
+        doc.text(`Phone: ${data.doctor.phone_number || ''}`, 40, 80);
     }
-
-    // Doctor Details (Right Aligned)
+    // Doctor Right Side
     const startX = 350;
-    doc.fontSize(14).fillColor('#000').text(`Dr. ${data.doctor.full_name}`, startX, 50, { align: 'right' });
-    doc.fontSize(10).fillColor('#333').text(data.doctor.degree || '', startX, 70, { align: 'right' });
-    doc.fontSize(9).fillColor('#666').text(data.doctor.specialist_title || '', startX, 85, { align: 'right' });
-    doc.text(`BMDC Reg: ${data.doctor.bmdc_reg}`, startX, 100, { align: 'right' });
+    doc.fontSize(14).fillColor('#000').text(`Dr. ${data.doctor.full_name}`, startX, 40, { align: 'right' });
+    doc.fontSize(10).fillColor('#333').text(data.doctor.degree || '', startX, 60, { align: 'right' });
+    doc.fontSize(9).fillColor('#666').text(data.doctor.specialist_title || '', startX, 75, { align: 'right' });
+    doc.text(`BMDC: ${data.doctor.bmdc_reg}`, startX, 90, { align: 'right' });
 
-    // Divider Line
-    doc.moveDown(2);
-    doc.lineWidth(2).strokeColor('#2c3e50').moveTo(50, 120).lineTo(550, 120).stroke();
+    // Separator
+    doc.moveDown(1.5);
+    doc.lineWidth(1).strokeColor('#ccc').moveTo(40, 110).lineTo(555, 110).stroke();
 
-    // 2. Patient Info (Top Left)
-    // Reset Y position to below the line
-    doc.y = 130; 
+    // --- PATIENT INFO BAR ---
+    doc.y = 115;
+    doc.fontSize(10).fillColor('#000');
+    doc.text(`Name: ${data.patient.name}`, 40, 120);
+    doc.text(`Age: ${data.patient.age || '--'}    Sex: ${data.patient.gender}`, 250, 120);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 450, 120, { align: 'right' });
     
-    doc.fontSize(11).fillColor('#000');
-    doc.text(`Name: ${data.patient.name}`, 50, 130);
-    doc.text(`Age: ${data.patient.age || '--'}   Gender: ${data.patient.gender}`, 350, 130, { align: 'right' });
-    
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 50, 145);
-    
-    doc.moveDown(2); // Add space before Rx
-    
-    // 3. Diagnosis (If provided)
-    if (data.diagnosis_text) {
-        doc.fontSize(14).fillColor('#0056b3').text(`Diagnosis: ${data.diagnosis_text}`, 50, doc.y);
-        doc.moveDown(0.5);
-        doc.lineWidth(1).stroke('#0056b3');
-        doc.moveDown(1);
-    }
-    
-    // 4. Rx (Prescription List)
-    doc.fontSize(18).fillColor('#000').text('Rx', 50, doc.y);
-    doc.moveDown(0.5);
+    doc.lineWidth(2).strokeColor('#2c3e50').moveTo(40, 140).lineTo(555, 140).stroke();
 
+    // --- MAIN LAYOUT: TWO COLUMNS ---
+    // Left Column: Width 30% (x: 40 to 190)
+    // Right Column: Width 70% (x: 210 to 555)
+    // Divider Line at x: 200
+    
+    const leftColX = 40;
+    const leftColWidth = 150;
+    const rightColX = 210;
+    const rightColWidth = 345;
+    const startY = 160;
+    let leftY = startY;
+    let rightY = startY;
+
+    // --- LEFT COLUMN (Clinical Findings) ---
+    
+    const printLeftSection = (title, content) => {
+        if (!content) return;
+        doc.fontSize(10).font('Helvetica-Bold').fillColor('#2c3e50').text(title, leftColX, leftY, { width: leftColWidth });
+        leftY += 12;
+        doc.fontSize(9).font('Helvetica').fillColor('#333').text(content, leftColX, leftY, { width: leftColWidth });
+        leftY = doc.y + 10; // Update Y
+    };
+
+    // 1. Chief Complaint (CC) / Symptoms
+    printLeftSection('Chief Complaint (C/C)', data.chief_complaint);
+
+    // 2. Examination Findings (O/E)
+    // Construct readable string from object
+    const ef = data.examination_findings || {};
+    let findingsText = '';
+    if (ef.bp) findingsText += `BP: ${ef.bp} mmHg\n`;
+    if (ef.pulse) findingsText += `Pulse: ${ef.pulse} bpm\n`;
+    if (ef.temp) findingsText += `Temp: ${ef.temp} F\n`;
+    if (ef.weight) findingsText += `Wt: ${ef.weight} kg\n`;
+    if (ef.height) findingsText += `Ht: ${ef.height}\n`;
+    if (ef.bmi) findingsText += `BMI: ${ef.bmi}\n`;
+    if (ef.spo2) findingsText += `SpO2: ${ef.spo2} %\n`;
+    if (ef.other) findingsText += `\n${ef.other}`;
+    
+    printLeftSection('On Examination (O/E)', findingsText);
+
+    // 3. Medical History
+    printLeftSection('History', data.medical_history);
+
+    // 4. Investigations (Ix)
+    printLeftSection('Investigations (Ix)', data.investigations);
+
+    // 5. Diagnosis (Dx) - Moved to Left side as per standard Pad
+    printLeftSection('Diagnosis (Dx)', data.diagnosis_text);
+
+
+    // --- RIGHT COLUMN (Rx & Advice) ---
+    doc.y = rightY;
+
+    // 1. Rx Symbol
+    doc.fontSize(18).font('Helvetica-Bold').fillColor('#000').text('Rx', rightColX, rightY);
+    rightY += 30;
+
+    // 2. Medicine List
     data.prescriptions.forEach((item, index) => {
-        const generic = item.generic_name || 'Generic Name N/A';
-        const strength = item.strength || 'Strength N/A';
-        const drugLine = `${index + 1}. ${generic} (${item.trade_names || 'N/A'}) - ${strength}`; 
+        doc.y = rightY; // Sync Y
+        const generic = item.generic_name || '';
+        const brand = item.trade_names || 'Brand N/A';
+        const strength = item.strength || '';
         
-        doc.fontSize(12).fillColor('#000').text(drugLine, 70, doc.y, { width: 450 });
+        // Line 1: Brand + Strength
+        doc.fontSize(11).font('Helvetica-Bold').fillColor('#000')
+           .text(`${index + 1}. ${brand} ${strength}`, rightColX, rightY);
         
-        // SIG Instruction
-        doc.fontSize(10).fillColor('#555').text(`SIG: ${item.sig_instruction}`, 80, doc.y);
+        // Line 2: Generic (Smaller)
+        doc.fontSize(8).font('Helvetica').fillColor('#555')
+           .text(`(${generic})`, rightColX + 15, doc.y + 2);
         
-        // Quantity & Duration
-        doc.text(`Qty: ${item.quantity} | Duration: ${item.duration}`, 80, doc.y);
+        // Line 3: SIG (Instruction) - Bold/Emphasis
+        doc.fontSize(10).font('Helvetica').fillColor('#000')
+           .text(`${item.sig_instruction} -- ${item.duration}`, rightColX + 15, doc.y + 2);
         
-        // Counseling Points from Inventory (as a quick note)
-        doc.fontSize(8).fillColor('#888').text(`Note: ${item.counseling_points.substring(0, 100)}...`, 80, doc.y + 2);
+        // Line 4: Counseling (if any)
+        if (item.counseling_points) {
+            doc.fontSize(8).font('Helvetica-Oblique').fillColor('#666')
+               .text(`Note: ${item.counseling_points}`, rightColX + 15, doc.y + 2);
+        }
 
-        doc.moveDown(1.5);
+        rightY = doc.y + 12; // Spacer
     });
 
-    // 5. Patient Advice/Guide (Bottom Section)
-    doc.moveDown(2);
-    doc.fontSize(14).fillColor('#0056b3').text('Patient Guide & General Advice', 50, doc.y);
-    doc.lineWidth(1).stroke('#0056b3');
-    doc.moveDown(0.5);
-    
+    rightY += 20;
+
+    // 3. Advice
     if (data.general_advice) {
-        doc.fontSize(10).fillColor('#333').text(data.general_advice, 50, doc.y);
-    } else {
-        doc.fontSize(10).fillColor('#888').text('No specific advice provided.', 50, doc.y);
+        doc.fontSize(11).font('Helvetica-Bold').fillColor('#2c3e50').text('Advice / Upodesh', rightColX, rightY);
+        rightY += 15;
+        doc.fontSize(10).font('Helvetica').fillColor('#333').text(data.general_advice, rightColX, rightY, { width: rightColWidth });
+        rightY = doc.y + 20;
     }
 
-    // 6. Footer (Doctor Signature Line)
-    doc.moveDown(4);
-    doc.lineWidth(1).lineCap('butt').moveTo(400, doc.y).lineTo(550, doc.y).stroke();
-    doc.fontSize(10).text('Physician Signature', 430, doc.y + 5);
+    // 4. Follow Up
+    if (data.follow_up_date) {
+        doc.fontSize(11).font('Helvetica-Bold').fillColor('#2c3e50').text('Follow-up', rightColX, rightY);
+        rightY += 15;
+        doc.fontSize(10).font('Helvetica').fillColor('#333').text(data.follow_up_date, rightColX, rightY);
+    }
 
-    doc.end(); // Finalize the PDF
+    // --- VERTICAL DIVIDER LINE ---
+    // Draw line from startY down to the bottom of the content
+    const maxY = Math.max(leftY, rightY, 700); // Ensure it goes down nicely
+    doc.lineWidth(0.5).strokeColor('#ddd').moveTo(200, startY).lineTo(200, maxY).stroke();
+
+    // --- FOOTER ---
+    doc.y = 750;
+    doc.fontSize(8).fillColor('#999').text('Generated by MedLipi - Open Source Healthcare', 40, 750, { align: 'center' });
+
+    doc.end();
 };
 
 export default router;
