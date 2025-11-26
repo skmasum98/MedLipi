@@ -16,7 +16,19 @@ function PrescriptionForm() {
 
     // --- EXISTING STATES (Keep all your state variables here) ---
     // Patient
-    const [patient, setPatient] = useState({ name: '', age: '', gender: 'Male', id: null });
+     const [patient, setPatient] = useState({ 
+        name: '', 
+        gender: 'Male', 
+        id: null,
+        dob: '', 
+        ageYears: '', 
+        ageMonths: '', 
+        ageDays: '',
+        mobile: '',
+        email: '',
+        address: '',
+        referred_by: ''
+    });
     const [patientSearchQuery, setPatientSearchQuery] = useState(''); 
     const [patientSearchResults, setPatientSearchResults] = useState([]); 
     const [patientHistory, setPatientHistory] = useState([]); 
@@ -81,6 +93,57 @@ function PrescriptionForm() {
     }, [prescriptions, authToken, VITE_API_URL]);
 
 
+    // 2. Create a Smart Change Handler for Patient Data
+    const handlePatientChange = (e) => {
+        const { name, value } = e.target;
+        
+        // Create a copy of the state
+        let updatedPatient = { ...patient, [name]: value };
+
+        // LOGIC: Auto-calculate DOB or Age
+        if (name === 'dob' && value) {
+            // If DOB changes -> Calculate Age (Y, M, D)
+            const birthDate = new Date(value);
+            const today = new Date();
+            
+            let years = today.getFullYear() - birthDate.getFullYear();
+            let months = today.getMonth() - birthDate.getMonth();
+            let days = today.getDate() - birthDate.getDate();
+
+            if (days < 0) {
+                months--;
+                days += new Date(today.getFullYear(), today.getMonth(), 0).getDate();
+            }
+            if (months < 0) {
+                years--;
+                months += 12;
+            }
+            
+            updatedPatient.ageYears = years;
+            updatedPatient.ageMonths = months;
+            updatedPatient.ageDays = days;
+            updatedPatient.age = years; // Legacy simple age
+        } 
+        else if (['ageYears', 'ageMonths', 'ageDays'].includes(name)) {
+            // If manual Age changes -> Calculate approximate DOB
+            const y = parseInt(updatedPatient.ageYears) || 0;
+            const m = parseInt(updatedPatient.ageMonths) || 0;
+            const d = parseInt(updatedPatient.ageDays) || 0;
+
+            if (y > 0 || m > 0 || d > 0) {
+                const date = new Date();
+                date.setFullYear(date.getFullYear() - y);
+                date.setMonth(date.getMonth() - m);
+                date.setDate(date.getDate() - d);
+                updatedPatient.dob = date.toISOString().split('T')[0]; // YYYY-MM-DD
+                updatedPatient.age = y;
+            }
+        }
+
+        setPatient(updatedPatient);
+    };
+
+
     // --- HANDLERS (Keep all your existing handlers) ---
     // Note: Ensure you have copy-pasted all the handlers (handlePatientSearch, selectPatient, handleRePrescribe, handleSearch, addDrugToPrescription, etc.) 
     // from your previous code into here. 
@@ -101,7 +164,26 @@ function PrescriptionForm() {
     };
 
     const selectPatient = async (p) => {
-        setPatient({ name: p.name, age: p.age, gender: p.gender, id: p.patient_id });
+        let ageDetails = { ageYears: p.age, ageMonths: 0, ageDays: 0 };
+        if (p.dob) {
+            const birthDate = new Date(p.dob);
+            const today = new Date();
+            // ... (Run the same calculation logic as above, or extract to a helper function) ...
+            // For simplicity here, we just set the DOB and let the user see the date
+        }
+        setPatient({ 
+            name: p.name, 
+            gender: p.gender, 
+            id: p.patient_id,
+            dob: p.dob ? p.dob.split('T')[0] : '', // Format YYYY-MM-DD
+            ageYears: p.age, // Fallback to stored int
+            ageMonths: '', 
+            ageDays: '',
+            mobile: p.mobile || '',
+            email: p.email || '',
+            address: p.address || '',
+            referred_by: p.referred_by || ''
+        });
         setPatientSearchQuery('');
         setPatientSearchResults([]);
         setIsHistoryLoading(true);
@@ -308,12 +390,42 @@ const handleDeleteInstructionBlock = async (blockId) => {
             setActiveTab('patient'); // Jump to patient tab if missing
             return; 
         }
+
+        // --- Age Formatting Logic ---
+        let formattedAge = patient.age || ''; 
+        
+        // If we have specific components, build the string
+        if (patient.ageYears || patient.ageMonths || patient.ageDays) {
+            const y = patient.ageYears ? `${patient.ageYears}Y ` : '';
+            const m = patient.ageMonths ? `${patient.ageMonths}M ` : '';
+            const d = patient.ageDays ? `${patient.ageDays}D` : '';
+            formattedAge = (y + m + d).trim();
+        } else if (patient.dob) {
+            // Fallback: If we have DOB but state wasn't updated manually
+            // (Optional calculation just to be safe)
+            const birthDate = new Date(patient.dob);
+            const today = new Date();
+            let years = today.getFullYear() - birthDate.getFullYear();
+            if (today.getMonth() < birthDate.getMonth() || (today.getMonth() === birthDate.getMonth() && today.getDate() < birthDate.getDate())) {
+                years--;
+            }
+            if (!formattedAge) formattedAge = `${years}Y`;
+        }
         
         const payload = {
-            patient: { ...patient, id: patient.id },
+            patient: { 
+                ...patient, 
+                id: patient.id,
+                age: formattedAge
+            },
             prescriptions: prescriptions.map(p => ({
-                drug_id: p.drug_id, quantity: p.quantity, sig_instruction: p.sig_instruction,
-                duration: p.duration, generic_name: p.generic_name, strength: p.strength, counseling_points: p.counseling_points
+                drug_id: p.drug_id, 
+                quantity: p.quantity, 
+                sig_instruction: p.sig_instruction,
+                duration: p.duration, 
+                generic_name: p.generic_name, 
+                strength: p.strength, 
+                counseling_points: p.counseling_points
             })),
             diagnosis_text: diagnosis.description || diagnosis.code,
             general_advice: advice,
@@ -331,7 +443,10 @@ const handleDeleteInstructionBlock = async (blockId) => {
                 const a = document.createElement('a'); a.href = url; a.download = 'prescription.pdf'; document.body.appendChild(a); a.click(); window.URL.revokeObjectURL(url);
                 
                 // Reset Form
-                setPatient({ name: '', age: '', gender: 'Male', id: null });
+                setPatient({ 
+                    name: '', gender: 'Male', id: null, dob: '', 
+                    ageYears: '', ageMonths: '', ageDays: '', mobile: '', email: '', address: '', referred_by: ''
+                });
                 setPrescriptions([]);
                 setDiagnosis({ code: '', description: '' });
                 setAdvice('');

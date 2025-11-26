@@ -128,7 +128,9 @@ router.get('/search', async (req, res) => {
         // Search patients linked to *this* doctor's prescriptions
         // This query finds patients whose names match and who have an existing prescription record by this doctor
         const query = `
-            SELECT DISTINCT p.patient_id, p.name, p.age, p.gender
+            SELECT DISTINCT 
+                p.patient_id, p.name, p.age, p.gender, 
+                p.dob, p.mobile, p.email, p.address, p.referred_by -- Select new columns
             FROM patients p
             JOIN prescriptions pr ON p.patient_id = pr.patient_id
             WHERE pr.doctor_id = ? AND p.name LIKE ?

@@ -54,10 +54,34 @@ router.post('/', async (req, res) => {
         // 1. Insert or Use Existing Patient
         if (!patientId) {
             // New Patient: Insert a new record
-            const patientQuery = `INSERT INTO patients (name, age, gender) VALUES (?, ?, ?)`;
-            const [patientResult] = await connection.query(patientQuery, [patient.name, patient.age || null, patient.gender]);
+            const patientQuery = `
+                INSERT INTO patients (name, age, gender, dob, mobile, email, address, referred_by) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+            const [patientResult] = await connection.query(patientQuery, [
+                patient.name, 
+                patient.age || null, 
+                patient.gender,
+                patient.dob || null, // NEW: Date of Birth
+                patient.mobile,      // NEW
+                patient.email,       // NEW
+                patient.address,     // NEW
+                patient.referred_by  // NEW
+            ]);
             patientId = patientResult.insertId;
-        } 
+        } else {
+            // OPTIONAL: Update existing patient contact info if it changed
+            const updateQuery = `
+                UPDATE patients 
+                SET dob = ?, mobile = ?, email = ?, address = ?, referred_by = ? 
+                WHERE patient_id = ?
+            `;
+            await connection.query(updateQuery, [
+                patient.dob || null, patient.mobile, patient.email, patient.address, patient.referred_by, patientId
+            ]);
+        }
+
+
 
         // 2. Insert all Prescriptions (One row per drug)
         for (const drug of prescriptions) {
