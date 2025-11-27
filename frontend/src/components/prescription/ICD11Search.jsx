@@ -40,7 +40,7 @@ const ICD11Search = ({ onSelect }) => {
 
     return (
         <div className="icd11-search-container relative w-full">
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
+            <label className="block text-sm font-semibold text-gray-700 mb-0">
                 Add Provisional Diagnosis (ICD-11)
             </label>
             
@@ -55,7 +55,7 @@ const ICD11Search = ({ onSelect }) => {
 
             {/* The Results Dropdown used by ECT */}
             <div 
-                className="ctw-window absolute z-50 bg-white shadow-xl border border-gray-200 rounded-b-md w-full mt-1" 
+                className="ctw-window absolute z-50 bg-white shadow-xl border border-gray-200 rounded-b-md w-full mt-0" 
                 data-ctw-ino={iNo}
                 style={{ maxHeight: '300px', overflowY: 'auto' }}
             ></div>
