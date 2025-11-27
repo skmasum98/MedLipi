@@ -7,6 +7,8 @@ import MedicationPanel from '../components/prescription/MedicationPanel';
 import ClinicalNotesPanel from '../components/prescription/ClinicalNotesPanel';
 import AssessmentPanel from '../components/prescription/AssessmentPanel';
 
+import ICD11Search from '../components/prescription/ICD11Search';
+
 const VITE_API_URL = import.meta.env.VITE_API_URL;
 
 function PrescriptionForm() {
@@ -42,6 +44,8 @@ function PrescriptionForm() {
     const [interactionWarnings, setInteractionWarnings] = useState([]); 
 
     // Notes
+     const [diagnosesList, setDiagnosesList] = useState([]); 
+
     const [diagnosis, setDiagnosis] = useState({ code: '', description: '' });
     const [diagnosisSearchQuery, setDiagnosisSearchQuery] = useState('');
     const [diagnosisSearchResults, setDiagnosisSearchResults] = useState([]);
@@ -102,6 +106,21 @@ function PrescriptionForm() {
         const timer = setTimeout(checkInteractions, 500); 
         return () => clearTimeout(timer); 
     }, [prescriptions, authToken, VITE_API_URL]);
+
+
+    // --- NEW HANDLER: Add Diagnosis from WHO Tool ---
+    const handleAddDiagnosis = (newDiagnosis) => {
+        // Prevent duplicates (optional check)
+        const exists = diagnosesList.find(d => d.code === newDiagnosis.code);
+        if (!exists) {
+            setDiagnosesList([...diagnosesList, newDiagnosis]);
+        }
+    };
+
+    // --- NEW HANDLER: Remove Diagnosis ---
+    const removeDiagnosis = (codeToRemove) => {
+        setDiagnosesList(diagnosesList.filter(d => d.code !== codeToRemove));
+    };
 
 
     // 2. Create a Smart Change Handler for Patient Data
@@ -442,7 +461,7 @@ const handleDeleteInstructionBlock = async (blockId) => {
             medical_history: history,
             examination_findings: exam, // Object
             investigations: investigations,
-            diagnosis_text: diagnosis.description || diagnosis.code,
+            diagnosis_text: formattedDiagnosisString,
             general_advice: advice,
             follow_up_date: followUp
         };
@@ -528,9 +547,12 @@ const handleDeleteInstructionBlock = async (blockId) => {
                             history={history} setHistory={setHistory}
                             investigations={investigations} setInvestigations={setInvestigations}
                             exam={exam} setExam={setExam}
-                            diagnosis={diagnosis} diagnosisSearchQuery={diagnosisSearchQuery}
-                            handleDiagnosisSearch={handleDiagnosisSearch} diagnosisSearchResults={diagnosisSearchResults}
-                            selectDiagnosis={selectDiagnosis}
+                            // diagnosis={diagnosis} diagnosisSearchQuery={diagnosisSearchQuery}
+                            // handleDiagnosisSearch={handleDiagnosisSearch} diagnosisSearchResults={diagnosisSearchResults}
+                            // selectDiagnosis={selectDiagnosis}
+                            diagnosesList={diagnosesList} 
+                            handleAddDiagnosis={handleAddDiagnosis}
+                            removeDiagnosis={removeDiagnosis}
                         />
                         <div className="flex justify-between mt-4">
                             <button onClick={() => setActiveTab('patient')} className="text-gray-600 px-4 py-2">&larr; Back</button>

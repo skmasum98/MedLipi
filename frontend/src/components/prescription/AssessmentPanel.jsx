@@ -1,4 +1,5 @@
 import React from 'react';
+import ICD11Search from './ICD11Search';
 
 function AssessmentPanel({
     // State
@@ -6,7 +7,10 @@ function AssessmentPanel({
     history, setHistory,
     investigations, setInvestigations,
     exam, setExam,
-    diagnosis, diagnosisSearchQuery, handleDiagnosisSearch, diagnosisSearchResults, selectDiagnosis
+    diagnosis, diagnosisSearchQuery, handleDiagnosisSearch, diagnosisSearchResults, selectDiagnosis,
+    diagnosesList, 
+    handleAddDiagnosis, 
+    removeDiagnosis
 }) {
     
     // Helper for Exam Changes
@@ -89,7 +93,7 @@ function AssessmentPanel({
                     </div>
 
                     {/* Diagnosis Search (Moved here) */}
-                    <div className="relative">
+                    {/* <div className="relative">
                         <label className="block text-sm font-semibold text-gray-700 mb-1">Provisional Diagnosis</label>
                         <input 
                             className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500"
@@ -112,6 +116,42 @@ function AssessmentPanel({
                                 ))}
                             </ul>
                         )}
+                    </div> */}
+
+                    <div className="mt-4">
+                        
+                        {/* 1. WHO ICD-11 Search Input */}
+                        <ICD11Search onSelect={handleAddDiagnosis} />
+
+                        {/* 2. Selected Diagnoses List (Chips/Tags) */}
+                        <div className="mt-3">
+                            <label className="text-xs font-bold text-gray-500 uppercase">Selected Diagnoses:</label>
+                            
+                            {diagnosesList.length === 0 ? (
+                                <p className="text-sm text-gray-400 italic mt-1">No diagnosis selected yet.</p>
+                            ) : (
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                    {diagnosesList.map((item, index) => (
+                                        <div 
+                                            key={index} 
+                                            className="flex items-center bg-indigo-50 border border-indigo-200 text-indigo-700 px-3 py-2 rounded-md shadow-sm"
+                                        >
+                                            <div className="flex flex-col leading-tight mr-2">
+                                                <span className="font-semibold text-sm">{item.description}</span>
+                                                <span className="text-xs text-indigo-500">{item.code}</span>
+                                            </div>
+                                            <button 
+                                                type="button"
+                                                onClick={() => removeDiagnosis(item.code)}
+                                                className="text-indigo-400 hover:text-red-600 transition-colors font-bold text-lg leading-none"
+                                            >
+                                                &times;
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                 </div>
