@@ -7,13 +7,11 @@ function AssessmentPanel({
     history, setHistory,
     investigations, setInvestigations,
     exam, setExam,
-    diagnosis, diagnosisSearchQuery, handleDiagnosisSearch, diagnosisSearchResults, selectDiagnosis,
     diagnosesList, 
     handleAddDiagnosis, 
     removeDiagnosis
 }) {
     
-    // Helper for Exam Changes
     const handleExamChange = (e) => {
         setExam({ ...exam, [e.target.name]: e.target.value });
     };
@@ -22,140 +20,117 @@ function AssessmentPanel({
         <fieldset className="p-5 border border-gray-200 rounded-xl mb-6 bg-white shadow-sm animate-fade-in">
             <legend className="text-lg font-bold text-indigo-700 px-2">Clinical Assessment</legend>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* --- TOP SECTION: 2 COLUMNS (Inputs & Vitals) --- */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 
-                {/* LEFT COL: Subjective (Symptoms & History) */}
+                {/* LEFT COL: Subjective */}
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1">Presenting Complaint / Symptoms (C/C)</label>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">Presenting Complaint (C/C)</label>
                         <textarea 
                             className="w-full p-2 border border-gray-300 rounded-md h-20 focus:ring-indigo-500"
-                            placeholder="e.g. Fever for 3 days, Cough..."
+                            placeholder="e.g. Fever for 3 days..."
                             value={chiefComplaint} onChange={(e) => setChiefComplaint(e.target.value)}
                         />
                     </div>
                     
                     <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1">History (Medical & Treatment)</label>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">History</label>
                         <textarea 
                             className="w-full p-2 border border-gray-300 rounded-md h-20 focus:ring-indigo-500"
-                            placeholder="e.g. HTN, DM, Taking Paracetamol..."
+                            placeholder="e.g. HTN, DM..."
                             value={history} onChange={(e) => setHistory(e.target.value)}
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1">Investigations (Lab Reports)</label>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">Investigations</label>
                         <textarea 
                             className="w-full p-2 border border-gray-300 rounded-md h-20 focus:ring-indigo-500"
-                            placeholder="e.g. CBC: Hb 10.5, RBS: 7.8..."
+                            placeholder="e.g. CBC, RBS..."
                             value={investigations} onChange={(e) => setInvestigations(e.target.value)}
                         />
                     </div>
                 </div>
 
-                {/* RIGHT COL: Objective (Vitals & Diagnosis) */}
+                {/* RIGHT COL: Objective (Vitals Only) */}
                 <div className="space-y-4">
-                    
-                    {/* Vitals Grid */}
-                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 h-full">
                         <label className="block text-sm font-bold text-indigo-800 mb-3 border-b pb-1">Examination Findings (O/E)</label>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <label className="text-xs text-gray-500 block">BP (mmHg)</label>
-                                <input type="text" name="bp" value={exam.bp} onChange={handleExamChange} className="w-full p-1 border rounded" placeholder="120/80" />
+                                <input type="text" name="bp" value={exam.bp} onChange={handleExamChange} className="w-full p-1 border rounded bg-white" placeholder="120/80" />
                             </div>
                             <div>
                                 <label className="text-xs text-gray-500 block">Pulse (bpm)</label>
-                                <input type="text" name="pulse" value={exam.pulse} onChange={handleExamChange} className="w-full p-1 border rounded" placeholder="72" />
+                                <input type="text" name="pulse" value={exam.pulse} onChange={handleExamChange} className="w-full p-1 border rounded bg-white" placeholder="72" />
                             </div>
                             <div>
                                 <label className="text-xs text-gray-500 block">Temp (°F)</label>
-                                <input type="text" name="temp" value={exam.temp} onChange={handleExamChange} className="w-full p-1 border rounded" placeholder="98.6" />
+                                <input type="text" name="temp" value={exam.temp} onChange={handleExamChange} className="w-full p-1 border rounded bg-white" placeholder="98.6" />
                             </div>
                             <div>
                                 <label className="text-xs text-gray-500 block">Weight (kg)</label>
-                                <input type="text" name="weight" value={exam.weight} onChange={handleExamChange} className="w-full p-1 border rounded" placeholder="65" />
+                                <input type="text" name="weight" value={exam.weight} onChange={handleExamChange} className="w-full p-1 border rounded bg-white" placeholder="65" />
                             </div>
                             <div>
                                 <label className="text-xs text-gray-500 block">SpO2 (%)</label>
-                                <input type="text" name="spo2" value={exam.spo2} onChange={handleExamChange} className="w-full p-1 border rounded" placeholder="98" />
+                                <input type="text" name="spo2" value={exam.spo2} onChange={handleExamChange} className="w-full p-1 border rounded bg-white" placeholder="98" />
                             </div>
                             <div>
                                 <label className="text-xs text-gray-500 block">BMI</label>
-                                <input type="text" name="bmi" value={exam.bmi} onChange={handleExamChange} className="w-full p-1 border rounded" placeholder="22.5" />
+                                <input type="text" name="bmi" value={exam.bmi} onChange={handleExamChange} className="w-full p-1 border rounded bg-white" placeholder="22.5" />
                             </div>
                         </div>
                         <div className="mt-3">
                             <label className="text-xs text-gray-500 block">Systemic Exam / Others</label>
-                            <input type="text" name="other" value={exam.other} onChange={handleExamChange} className="w-full p-1 border rounded" placeholder="Chest: Clear, CVS: S1+S2..." />
+                            <textarea name="other" value={exam.other} onChange={handleExamChange} className="w-full p-1 border rounded bg-white h-20 resize-none" placeholder="Chest: Clear, CVS: S1+S2..." />
                         </div>
                     </div>
-
-                    {/* Diagnosis Search (Moved here) */}
-                    {/* <div className="relative">
-                        <label className="block text-sm font-semibold text-gray-700 mb-1">Provisional Diagnosis</label>
-                        <input 
-                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500"
-                            type="text"
-                            placeholder="Search ICD or type..." 
-                            value={diagnosisSearchQuery} 
-                            onChange={handleDiagnosisSearch}
-                        />
-                        {(diagnosis.code || diagnosis.description) && (
-                            <p className="text-xs mt-1 p-1 bg-indigo-50 border border-indigo-100 rounded text-indigo-700">
-                                Selected: <strong>{diagnosis.description || diagnosis.code}</strong>
-                            </p>
-                        )}
-                        {diagnosisSearchResults.length > 0 && (
-                            <ul className="absolute z-20 w-full bg-white border border-gray-400 rounded-md max-h-40 overflow-y-auto shadow-xl mt-1">
-                                {diagnosisSearchResults.map(d => (
-                                    <li key={d.code_id} className="p-2 border-b hover:bg-gray-100 cursor-pointer text-sm" onClick={() => selectDiagnosis(d)}>
-                                        <strong>{d.code}</strong> {d.simplified_name}
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </div> */}
-
-                    <div className="mt-4">
-                        
-                        {/* 1. WHO ICD-11 Search Input */}
-                        <ICD11Search onSelect={handleAddDiagnosis} />
-
-                        {/* 2. Selected Diagnoses List (Chips/Tags) */}
-                        <div className="mt-3">
-                            <label className="text-xs font-bold text-gray-500 uppercase">Selected Diagnoses:</label>
-                            
-                            {diagnosesList.length === 0 ? (
-                                <p className="text-sm text-gray-400 italic mt-1">No diagnosis selected yet.</p>
-                            ) : (
-                                <div className="flex flex-wrap gap-2 mt-2">
-                                    {diagnosesList.map((item, index) => (
-                                        <div 
-                                            key={index} 
-                                            className="flex items-center bg-indigo-50 border border-indigo-200 text-indigo-700 px-3 py-2 rounded-md shadow-sm"
-                                        >
-                                            <div className="flex flex-col leading-tight mr-2">
-                                                <span className="font-semibold text-sm">{item.description}</span>
-                                                <span className="text-xs text-indigo-500">{item.code}</span>
-                                            </div>
-                                            <button 
-                                                type="button"
-                                                onClick={() => removeDiagnosis(item.code)}
-                                                className="text-indigo-400 hover:text-red-600 transition-colors font-bold text-lg leading-none"
-                                            >
-                                                &times;
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
                 </div>
             </div>
+
+            {/* --- BOTTOM SECTION: DIAGNOSIS (FULL WIDTH) --- */}
+            <div className="border-t border-gray-200 pt-6">
+                
+                {/* 1. WHO ICD-11 Search Input (Full Width) */}
+                <div className="relative z-50"> {/* High Z-Index ensures dropdown floats over everything below */}
+                    <ICD11Search onSelect={handleAddDiagnosis} />
+                </div>
+
+                {/* 2. Selected Diagnoses List (Chips/Tags) */}
+                <div className="mt-4">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Selected Diagnoses:</label>
+                    
+                    {diagnosesList.length === 0 ? (
+                        <p className="text-sm text-gray-400 italic mt-1">No diagnosis selected yet.</p>
+                    ) : (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                            {diagnosesList.map((item, index) => (
+                                <div 
+                                    key={index} 
+                                    className="flex items-center bg-blue-50 border border-blue-200 text-blue-800 px-3 py-2 rounded-md shadow-sm transition-all hover:bg-blue-100"
+                                >
+                                    <div className="flex flex-col leading-tight mr-3">
+                                        <span className="font-semibold text-sm">{item.description}</span>
+                                        <span className="text-[10px] text-blue-500 uppercase font-mono">{item.code}</span>
+                                    </div>
+                                    <button 
+                                        type="button"
+                                        onClick={() => removeDiagnosis(item.code)}
+                                        className="text-blue-400 hover:text-red-600 hover:bg-red-50 rounded-full p-1 transition-colors"
+                                        title="Remove"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+
         </fieldset>
     );
 }

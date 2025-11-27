@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import * as ECT from '@whoicd/icd11ect';
+import * as ECT from '@kachiz/ecticd11';
 import '@whoicd/icd11ect/style.css';
 
 const ICD11Search = ({ onSelect }) => {
@@ -39,7 +39,7 @@ const ICD11Search = ({ onSelect }) => {
     }, [onSelect]);
 
     return (
-        <div className="icd11-search-container relative">
+        <div className="icd11-search-container relative w-full">
             <label className="block text-sm font-semibold text-gray-700 mb-1">
                 Add Provisional Diagnosis (ICD-11)
             </label>
