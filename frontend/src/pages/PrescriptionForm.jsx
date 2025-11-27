@@ -441,6 +441,9 @@ const handleDeleteInstructionBlock = async (blockId) => {
             }
             if (!formattedAge) formattedAge = `${years}Y`;
         }
+        const formattedDiagnosisString = diagnosesList.map((d, index) => 
+            `${index + 1}. ${d.description} (${d.code})`
+        ).join('\n');
         
         const payload = {
             patient: { 
