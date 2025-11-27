@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import * as ECT from '@kachiz/ecticd11';
+import * as ECT from '@whoicd/icd11ect';
 import '@whoicd/icd11ect/style.css';
 
 const ICD11Search = ({ onSelect }) => {
