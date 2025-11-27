@@ -133,11 +133,11 @@ router.get('/search', async (req, res) => {
                 p.dob, p.mobile, p.email, p.address, p.referred_by -- Select new columns
             FROM patients p
             JOIN prescriptions pr ON p.patient_id = pr.patient_id
-            WHERE pr.doctor_id = ? AND p.name LIKE ?
+            WHERE pr.doctor_id = ? AND (p.name LIKE ? OR p.mobile LIKE ?)
             LIMIT 20
         `;
         
-        const [patients] = await pool.query(query, [doctorId, searchTerm]);
+        const [patients] = await pool.query(query, [doctorId, searchTerm,  searchTerm]);
         
         res.json(patients);
     } catch (error) {
