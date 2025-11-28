@@ -15,6 +15,7 @@ import patientRoutes from './routes/patients.js';
 import interactionRoutes from './routes/interactions.js'; 
 import diagnosisRoutes from './routes/diagnoses.js';
 import analyticsRoutes from './routes/analytics.js';
+import icdRoutes from './routes/icd.js';
 
 // Initialize Express App
 const app = express();
@@ -40,6 +41,7 @@ app.use('/api/patients', patientRoutes);
 app.use('/api/interactions', interactionRoutes);
 app.use('/api/diagnoses', diagnosisRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/icd', icdRoutes);
 
 
 // Start Server

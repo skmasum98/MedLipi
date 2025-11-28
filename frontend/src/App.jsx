@@ -34,7 +34,7 @@ function App() {
             {/* Wrap the entire App logic in the AuthProvider */}
             <AuthProvider>
                 <Header />
-                <main className="pt-4 pb-10">
+                <main className="pt-4 pb-10 min-w-0 min-h-0">
                 <Routes>
                     <Route path="/register" element={<Register />} />
                     {/* Login component uses the login function from context */}

@@ -9,3 +9,11 @@
     animation: fadeIn 0.3s ease-out forwards;
 }
 
+/* Add to your CSS file or Tailwind directives */
+.recharts-wrapper {
+  min-width: 0 !important;
+}
+
+.recharts-surface {
+  min-width: 0 !important;
+}
