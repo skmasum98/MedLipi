@@ -16,7 +16,7 @@ function Inventory() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingDrug, setEditingDrug] = useState(null);
     const [formData, setFormData] = useState({
-        generic_name: '', trade_names: '', strength: '', counseling_points: ''
+        generic_name: '', trade_names: '', strength: '', counseling_points: '', manufacturer: ''
     });
 
     // --- Search Handler ---
@@ -163,6 +163,17 @@ function Inventory() {
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Default Counseling/Note</label>
                         <textarea className="w-full p-2 border rounded-md" value={formData.counseling_points} onChange={(e) => setFormData({...formData, counseling_points: e.target.value})} rows="3" placeholder="Warning messages or usage advice..." />
+                    </div>
+                     {/* New Manufacturer Input */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">Manufacturer / Company</label>
+                        <input 
+                            className="w-full p-2 border rounded-md" 
+                            type="text" 
+                            value={formData.manufacturer || ''} 
+                            onChange={(e) => setFormData({...formData, manufacturer: e.target.value})} 
+                            placeholder="e.g. Square, Beximco" 
+                        />
                     </div>
                     <div className="flex justify-end gap-3 mt-4">
                         <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border rounded-md">Cancel</button>

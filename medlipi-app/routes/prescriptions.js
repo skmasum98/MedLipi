@@ -115,17 +115,7 @@ router.post('/', async (req, res) => {
                 chief_complaint, medical_history, examString, investigations, follow_up_date
             ];            
 
-            // const prescriptionValues = [
-            //     doctorId, 
-            //     patientId, 
-            //     drug.drug_id, 
-            //     drug.quantity, 
-            //     drug.sig_instruction, 
-            //     drug.duration,
-            //     // Only save the diagnosis/advice once with the first drug (or we can update the schema to separate this)
-            //     diagnosis_text, 
-            //     general_advice
-            // ];
+            
             await connection.query(prescriptionQuery, values);
         }
 
@@ -258,7 +248,7 @@ const generatePrescriptionPDF = (res, data) => {
     data.prescriptions.forEach((item, index) => {
         doc.y = rightY; // Sync Y
         const generic = item.generic_name || '';
-        const brand = item.trade_names || 'Brand N/A';
+        const brand = item.trade_names || item.generic_name || 'Medicine'; 
         const strength = item.strength || '';
         
         // Line 1: Brand + Strength

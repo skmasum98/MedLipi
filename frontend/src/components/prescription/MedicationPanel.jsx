@@ -19,24 +19,48 @@ function MedicationPanel({
         <fieldset className="p-4 border border-gray-300 rounded-lg mb-6 bg-white shadow-sm">
             <legend className="text-lg font-semibold text-indigo-700 px-2">Medications & SIG</legend>
 
-            {/* 1. Add Medication */}
-            <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Search Drug</label>
+             {/* 1. Add Medication */}
+            <div className="mb-6 relative"> {/* Add relative for dropdown positioning */}
+                <label className="block text-sm font-medium text-gray-700 mb-1">Search Drug (Brand or Generic)</label>
                 <input 
                     className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                    type="text" placeholder="Search Drug Name (e.g., Napa, Amoxicillin)" value={searchQuery} onChange={handleSearch} 
+                    type="text" 
+                    placeholder="Type Brand (e.g. Napa) or Generic (e.g. Paracetamol)..." 
+                    value={searchQuery} 
+                    onChange={handleSearch} 
                 />
+                
+                {/* Updated Search Results Dropdown */}
                 {searchResults.length > 0 && (
-                    <ul className="list-none p-0 mt-2 border border-gray-400 rounded-md max-h-52 overflow-y-auto shadow-md bg-white">
+                    <ul className="absolute z-50 w-full bg-white border border-gray-300 rounded-md max-h-60 overflow-y-auto shadow-xl mt-1 text-sm">
                         {searchResults.map(drug => (
-                            <li key={drug.drug_id} className="p-3 border-b border-gray-200 cursor-pointer hover:bg-indigo-50" onClick={() => addDrugToPrescription(drug)}>
-                                <strong>{drug.generic_name}</strong> <span className="text-sm text-gray-500">({drug.trade_names}) - {drug.strength}</span>
+                            <li 
+                                key={drug.drug_id} 
+                                className="p-3 border-b border-gray-100 cursor-pointer hover:bg-indigo-50 flex justify-between items-center" 
+                                onClick={() => addDrugToPrescription(drug)}
+                            >
+                                <div>
+                                    {/* Display Brand Name Prominently */}
+                                    <strong className="block text-gray-800 text-base">
+                                        {drug.trade_names} <span className="text-gray-500 font-normal text-xs">{drug.strength}</span>
+                                    </strong>
+                                    {/* Display Generic Name */}
+                                    <span className="text-xs text-gray-500 italic">
+                                        {drug.generic_name}
+                                    </span>
+                                </div>
+                                
+                                {/* Display Company Name */}
+                                {drug.manufacturer && (
+                                    <span className="text-xs font-bold text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full">
+                                        {drug.manufacturer}
+                                    </span>
+                                )}
                             </li>
                         ))}
                     </ul>
                 )}
             </div>
-
             {/* 2. Warnings */}
             {interactionWarnings.length > 0 && (
                 <div className="mb-6 p-4 border border-red-400 bg-red-100 rounded-lg">

@@ -181,7 +181,11 @@ function PrescriptionForm() {
     };
 
     const addDrugToPrescription = (drug) => {
-        setPrescriptions([...prescriptions, { ...drug, quantity: '', sig_instruction: '', duration: '', tempId: Date.now() }]);
+        setPrescriptions([...prescriptions, { ...drug, 
+            trade_names: drug.trade_names || '',
+            quantity: '', 
+            sig_instruction: '', 
+            duration: '', tempId: Date.now() }]);
         setSearchResults([]); setSearchQuery('');
     };
 
@@ -271,7 +275,7 @@ function PrescriptionForm() {
             patient: { ...patient, id: patient.id, age: formattedAge },
             prescriptions: prescriptions.map(p => ({
                 drug_id: p.drug_id, quantity: p.quantity, sig_instruction: p.sig_instruction,
-                duration: p.duration, generic_name: p.generic_name, strength: p.strength, counseling_points: p.counseling_points
+                duration: p.duration, generic_name: p.generic_name, strength: p.strength, counseling_points: p.counseling_points, trade_names: p.trade_names,
             })),
             chief_complaint: chiefComplaint,
             medical_history: history,

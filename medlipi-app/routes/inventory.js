@@ -8,10 +8,10 @@ router.use(verifyToken);
 // --- GET Search (Existing) ---
 router.get('/search', async (req, res) => {
     const searchTerm = req.query.q ? `%${req.query.q}%` : '';
-    if (!searchTerm) return res.json([]); // Return empty if no search
+    if (!searchTerm) return res.json([]); 
     try {
         const query = `
-            SELECT drug_id, generic_name, trade_names, strength, counseling_points 
+            SELECT drug_id, generic_name, trade_names, strength, counseling_points, manufacturer
             FROM drug_inventory 
             WHERE generic_name LIKE ? OR trade_names LIKE ?
             LIMIT 20`; 
@@ -25,15 +25,15 @@ router.get('/search', async (req, res) => {
 
 // --- POST Add New Drug (NEW) ---
 router.post('/', async (req, res) => {
-    const { generic_name, trade_names, strength, counseling_points } = req.body;
+    const { generic_name, trade_names, strength, counseling_points, manufacturer } = req.body;
     
     if (!generic_name || !trade_names) {
         return res.status(400).json({ message: 'Generic Name and Trade Name are required.' });
     }
 
     try {
-        const query = `INSERT INTO drug_inventory (generic_name, trade_names, strength, counseling_points) VALUES (?, ?, ?, ?)`;
-        const [result] = await pool.query(query, [generic_name, trade_names, strength, counseling_points]);
+        const query = `INSERT INTO drug_inventory (generic_name, trade_names, strength, counseling_points, manufacturer) VALUES (?, ?, ?, ?, ?)`;
+        const [result] = await pool.query(query, [generic_name, trade_names, strength, counseling_points, manufacturer]);
         res.status(201).json({ message: 'Drug added successfully', drugId: result.insertId });
     } catch (error) {
         console.error('Error adding drug:', error);
@@ -43,15 +43,15 @@ router.post('/', async (req, res) => {
 
 // --- PUT Update Drug (NEW) ---
 router.put('/:id', async (req, res) => {
-    const { generic_name, trade_names, strength, counseling_points } = req.body;
+    const { generic_name, trade_names, strength, counseling_points, manufacturer } = req.body;
     const drugId = req.params.id;
 
     try {
         const query = `
             UPDATE drug_inventory 
-            SET generic_name = ?, trade_names = ?, strength = ?, counseling_points = ?
+            SET generic_name = ?, trade_names = ?, strength = ?, counseling_points = ?, manufacturer = ?
             WHERE drug_id = ?`;
-        await pool.query(query, [generic_name, trade_names, strength, counseling_points, drugId]);
+        await pool.query(query, [generic_name, trade_names, strength, counseling_points, manufacturer, drugId]);
         res.json({ message: 'Drug updated successfully' });
     } catch (error) {
         console.error('Error updating drug:', error);
