@@ -76,13 +76,26 @@ function MedicationPanel({
                 </div>
             )}
 
-            {/* 3. Prescription List */}
+           {/* 3. Prescription List */}
             <div className="mb-6">
                 <h4 className="font-medium text-gray-700 mb-2">Prescription List</h4>
                 {prescriptions.length === 0 ? <p className="text-gray-500 italic">No medications added.</p> : (
                     prescriptions.map(item => (
                         <div key={item.tempId} className="flex flex-wrap gap-2 items-center border-b border-gray-200 py-3">
-                            <div className="font-bold text-indigo-600 flex-1 min-w-[150px]">{item.generic_name} ({item.strength})</div>
+                            
+                            {/* --- UPDATED NAME SECTION --- */}
+                            <div className="flex-1 min-w-[150px] flex flex-col">
+                                {/* Brand Name (Primary) */}
+                                <span className="font-bold text-indigo-700">
+                                    {item.trade_names || item.generic_name} {item.strength && `- ${item.strength}`}
+                                </span>
+                                {/* Generic + Strength (Secondary) */}
+                                <span className="text-xs text-gray-500">
+                                    {item.trade_names && `(${item.generic_name})`} {item.strength && `- ${item.strength}`}
+                                </span>
+                            </div>
+                            {/* ----------------------------- */}
+
                             <input className="p-1 border border-gray-300 rounded-md w-24 text-center" type="text" placeholder="Qty" value={item.quantity} onChange={(e) => handlePrescriptionItemChange(item.tempId, 'quantity', e.target.value)} />
                             <input className="p-1 border border-gray-300 rounded-md flex-2 min-w-[200px]" type="text" placeholder="SIG" value={item.sig_instruction} onChange={(e) => handlePrescriptionItemChange(item.tempId, 'sig_instruction', e.target.value)} />
                             <input className="p-1 border border-gray-300 rounded-md w-28 text-center" type="text" placeholder="Duration" value={item.duration} onChange={(e) => handlePrescriptionItemChange(item.tempId, 'duration', e.target.value)} />
