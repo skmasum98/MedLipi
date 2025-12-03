@@ -3,7 +3,7 @@ import pool from '../db.js';
 import verifyToken from '../middleware/auth.js'; 
 
 const router = express.Router();
-router.use(verifyToken); // All patient routes require the doctor to be logged in
+router.use(verifyToken); 
 
 // --- GET All Patients (Paginated Search) ---
 router.get('/', async (req, res) => {
@@ -13,8 +13,6 @@ router.get('/', async (req, res) => {
     const searchTerm = q ? `%${q}%` : '%';
 
     try {
-        // Get Patients linked to this doctor
-        // Includes 'Last Visit' calculation
         const query = `
             SELECT 
                 p.patient_id, p.name, p.age, p.gender,
@@ -27,7 +25,6 @@ router.get('/', async (req, res) => {
             LIMIT ? OFFSET ?
         `;
         
-        // Get Total Count for Pagination
         const countQuery = `
             SELECT COUNT(DISTINCT p.patient_id) as total
             FROM patients p
@@ -52,8 +49,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-// --- GET Single Patient Full Profile ---
-// We can reuse or expand the existing '/:id/history', but let's make a dedicated profile fetch
+// --- GET Single Patient Full Profile (Timeline & Edit Data) ---
 router.get('/:id/profile', async (req, res) => {
     const patientId = req.params.id;
     const doctorId = req.doctor.id;
@@ -68,11 +64,15 @@ router.get('/:id/profile', async (req, res) => {
         if (patientRows.length === 0) return res.status(404).json({ message: 'Patient not found' });
 
         // 2. Visit History (Grouped)
-        // This reuses logic similar to the history endpoint but formatted for a timeline
+        // FIX: Added all the clinical fields (chief_complaint, etc.) to the SELECT
         const historyQuery = `
             SELECT 
-                pr.prescription_id, pr.created_at, pr.diagnosis_text, pr.general_advice,
-                d.generic_name, d.trade_names, d.strength, pr.sig_instruction, pr.duration
+                pr.prescription_id, pr.created_at, 
+                pr.diagnosis_text, pr.general_advice,
+                pr.chief_complaint, pr.medical_history, pr.examination_findings, 
+                pr.investigations, pr.follow_up_date,
+                pr.drug_id, pr.quantity, pr.sig_instruction, pr.duration,
+                d.generic_name, d.trade_names, d.strength, d.counseling_points
             FROM prescriptions pr
             LEFT JOIN drug_inventory d ON pr.drug_id = d.drug_id
             WHERE pr.patient_id = ? AND pr.doctor_id = ?
@@ -84,23 +84,37 @@ router.get('/:id/profile', async (req, res) => {
         const timeline = historyRows.reduce((acc, row) => {
             const date = new Date(row.created_at).toLocaleDateString();
             const time = new Date(row.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const key = `${date}_${row.diagnosis_text}`; // Group by date + diagnosis context
+            // Use exact timestamp string for grouping to allow precision editing
+            const key = row.created_at.toISOString(); 
             
             if (!acc[key]) {
                 acc[key] = {
                     date, time,
+                    raw_date: row.created_at, // Critical for Edit/Update identification
                     diagnosis: row.diagnosis_text,
                     advice: row.general_advice,
+                    // Map new clinical fields so they appear in Edit Form
+                    chief_complaint: row.chief_complaint,
+                    medical_history: row.medical_history,
+                    examination_findings: row.examination_findings,
+                    investigations: row.investigations,
+                    follow_up_date: row.follow_up_date,
                     drugs: []
                 };
             }
-            acc[key].drugs.push({
-                name: row.generic_name,
-                brand: row.trade_names,
-                strength: row.strength,
-                sig: row.sig_instruction,
-                duration: row.duration
-            });
+            // Only add drug if it exists (in case of manual row insertion errors)
+            if (row.drug_id) {
+                acc[key].drugs.push({
+                    drug_id: row.drug_id,
+                    name: row.generic_name,
+                    brand: row.trade_names,
+                    strength: row.strength,
+                    sig: row.sig_instruction,
+                    duration: row.duration,
+                    quantity: row.quantity,
+                    counseling_points: row.counseling_points
+                });
+            }
             return acc;
         }, {});
 
@@ -115,7 +129,7 @@ router.get('/:id/profile', async (req, res) => {
     }
 });
 
-// --- GET Search Patients by Name (/api/patients/search?q=) ---
+// --- GET Search Patients ---
 router.get('/search', async (req, res) => {
     const searchTerm = req.query.q ? `%${req.query.q}%` : '';
     const doctorId = req.doctor.id;
@@ -125,19 +139,17 @@ router.get('/search', async (req, res) => {
     }
 
     try {
-        // Search patients linked to *this* doctor's prescriptions
-        // This query finds patients whose names match and who have an existing prescription record by this doctor
         const query = `
             SELECT DISTINCT 
                 p.patient_id, p.name, p.age, p.gender, 
-                p.dob, p.mobile, p.email, p.address, p.referred_by -- Select new columns
+                p.dob, p.mobile, p.email, p.address, p.referred_by 
             FROM patients p
             JOIN prescriptions pr ON p.patient_id = pr.patient_id
             WHERE pr.doctor_id = ? AND (p.name LIKE ? OR p.mobile LIKE ?)
             LIMIT 20
         `;
         
-        const [patients] = await pool.query(query, [doctorId, searchTerm,  searchTerm]);
+        const [patients] = await pool.query(query, [doctorId, searchTerm, searchTerm]);
         
         res.json(patients);
     } catch (error) {
@@ -146,18 +158,17 @@ router.get('/search', async (req, res) => {
     }
 });
 
-// --- GET Patient History by ID (/api/patients/:patientId/history) ---
+// --- GET Mini History (For Prescription Form) ---
 router.get('/:patientId/history', async (req, res) => {
     const patientId = req.params.patientId;
     const doctorId = req.doctor.id;
 
     try {
-        // Fetch all prescriptions for a patient by this specific doctor
         const query = `
             SELECT 
-            pr.prescription_id, pr.created_at, pr.diagnosis_text, pr.general_advice,
-            di.drug_id,
-            di.generic_name, di.trade_names, di.strength, pr.sig_instruction, pr.quantity, pr.duration
+                pr.prescription_id, pr.created_at, pr.diagnosis_text, pr.general_advice,
+                pr.drug_id, pr.sig_instruction, pr.quantity, pr.duration,
+                di.generic_name, di.trade_names, di.strength, di.counseling_points
             FROM prescriptions pr
             JOIN drug_inventory di ON pr.drug_id = di.drug_id
             WHERE pr.patient_id = ? AND pr.doctor_id = ?
@@ -166,7 +177,6 @@ router.get('/:patientId/history', async (req, res) => {
         
         const [history] = await pool.query(query, [patientId, doctorId]);
 
-        // Group the drugs by prescription_id to format the history nicely
         const groupedHistory = history.reduce((acc, item) => {
             const date = new Date(item.created_at).toLocaleDateString();
             if (!acc[date]) {
@@ -185,11 +195,11 @@ router.get('/:patientId/history', async (req, res) => {
                 sig: item.sig_instruction,
                 quantity: item.quantity,
                 duration: item.duration,
+                counseling_points: item.counseling_points
             });
             return acc;
         }, {});
         
-        // Convert the grouped object back to an array
         res.json(Object.values(groupedHistory));
 
     } catch (error) {

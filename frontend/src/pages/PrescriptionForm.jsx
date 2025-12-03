@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth'; 
+import { useLocation, useNavigate } from 'react-router';
 
 // Import Sub-Components
 import PatientPanel from '../components/prescription/PatientPanel';
@@ -11,6 +12,8 @@ const VITE_API_URL = import.meta.env.VITE_API_URL;
 
 function PrescriptionForm() {
     const { token: authToken } = useAuth();
+    const location = useLocation();
+    const navigate = useNavigate();
 
     // --- 1. TAB STATE ---
     const [activeTab, setActiveTab] = useState('patient'); 
@@ -26,11 +29,11 @@ function PrescriptionForm() {
     const [patientHistory, setPatientHistory] = useState([]); 
     const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
-    // --- ASSESSMENT STATE (New) ---
+    // --- ASSESSMENT STATE ---
     const [chiefComplaint, setChiefComplaint] = useState('');
     const [history, setHistory] = useState(''); 
     const [investigations, setInvestigations] = useState('');
-    const [diagnosesList, setDiagnosesList] = useState([]); // Array for ICD-11
+    const [diagnosesList, setDiagnosesList] = useState([]); 
     const [exam, setExam] = useState({
         bp: '', pulse: '', temp: '', weight: '', height: '', bmi: '', spo2: '', other: ''
     });
@@ -45,6 +48,9 @@ function PrescriptionForm() {
     const [advice, setAdvice] = useState('');
     const [followUp, setFollowUp] = useState('');
 
+    // --- EDIT MODE STATE ---
+    const [originalDate, setOriginalDate] = useState(null);
+
     // --- TEMPLATES & MODAL STATES ---
     const [sigTemplates, setSigTemplates] = useState([]);
     const [instructionBlocks, setInstructionBlocks] = useState([]); 
@@ -56,7 +62,7 @@ function PrescriptionForm() {
     const [newInstructionBlock, setNewInstructionBlock] = useState({ title: '', content: '' });
 
 
-    // --- DATA FETCHING ---
+    // --- 1. DATA FETCHING ---
     useEffect(() => {
         if (!authToken) return;
         const fetchData = async () => {
@@ -72,7 +78,83 @@ function PrescriptionForm() {
         fetchData();
     }, [authToken, VITE_API_URL]);
 
-    // --- INTERACTION CHECKER ---
+    // --- 2. EDIT MODE INITIALIZATION ---
+    useEffect(() => {
+        if (location.state && location.state.editMode) {
+            const { visitData, patientData } = location.state;
+            
+            // A. Populate Patient
+            setPatient({
+                name: patientData.name,
+                gender: patientData.gender,
+                id: patientData.patient_id,
+                age: patientData.age,
+                dob: patientData.dob || '',
+                ageYears: '', ageMonths: '', ageDays: '',
+                mobile: patientData.mobile || '',
+                email: patientData.email || '',
+                address: patientData.address || '',
+                referred_by: patientData.referred_by || ''
+            });
+
+            // B. Populate Assessment
+            setChiefComplaint(visitData.chief_complaint || '');
+            setHistory(visitData.medical_history || '');
+            setInvestigations(visitData.investigations || '');
+            setAdvice(visitData.advice || '');
+            setFollowUp(visitData.follow_up_date || '');
+            
+            // C. Populate Exam
+            if (visitData.examination_findings) {
+                try {
+                    const parsedExam = typeof visitData.examination_findings === 'string' 
+                        ? JSON.parse(visitData.examination_findings) 
+                        : visitData.examination_findings;
+                    setExam({ ...exam, ...parsedExam });
+                } catch (e) { console.error("Error parsing exam data", e); }
+            }
+
+            // D. Populate Diagnosis
+            if (visitData.diagnosis) {
+                const lines = visitData.diagnosis.split('\n');
+                const parsedDiagnoses = lines.map(line => {
+                    // Extract "Description (Code)"
+                    const match = line.match(/^\d+\.\s+(.+)\s+\((.+)\)$/);
+                    if (match) return { description: match[1], code: match[2] };
+                    return null;
+                }).filter(Boolean);
+                
+                // If regex fails (e.g. manual entry), fallback to simple object
+                if (parsedDiagnoses.length === 0 && visitData.diagnosis) {
+                     setDiagnosesList([{ code: '', description: visitData.diagnosis }]);
+                } else {
+                     setDiagnosesList(parsedDiagnoses);
+                }
+            }
+
+            // E. Populate Prescriptions
+            if (visitData.drugs) {
+                const editPrescriptions = visitData.drugs.map(d => ({
+                    generic_name: d.name,
+                    trade_names: d.brand,
+                    strength: d.strength,
+                    sig_instruction: d.sig,
+                    duration: d.duration,
+                    quantity: d.quantity,
+                    drug_id: d.drug_id,
+                    counseling_points: d.counseling_points || '',
+                    tempId: Date.now() + Math.random()
+                }));
+                setPrescriptions(editPrescriptions);
+            }
+
+            // F. Set Metadata
+            setOriginalDate(visitData.raw_date);
+        }
+    }, [location.state]);
+
+
+    // --- 3. INTERACTION CHECKER ---
     useEffect(() => {
         const checkInteractions = async () => {
             if (!authToken || prescriptions.length < 2) return setInteractionWarnings([]);
@@ -93,7 +175,23 @@ function PrescriptionForm() {
     }, [prescriptions, authToken, VITE_API_URL]);
 
 
-    // --- HANDLER: PATIENT DATA & AGE ---
+    // --- HANDLERS: DIAGNOSIS (ICD-11) ---
+    const handleAddDiagnosis = useCallback((newDiagnosis) => {
+        setDiagnosesList(prevList => {
+            const exists = prevList.find(d => d.code === newDiagnosis.code);
+            if (!exists) {
+                return [...prevList, newDiagnosis];
+            }
+            return prevList;
+        });
+    }, []);
+
+    const removeDiagnosis = (codeToRemove) => {
+        setDiagnosesList(diagnosesList.filter(d => d.code !== codeToRemove));
+    };
+
+
+    // --- HANDLERS: PATIENT ---
     const handlePatientChange = (e) => {
         const { name, value } = e.target;
         let updatedPatient = { ...patient, [name]: value };
@@ -106,7 +204,6 @@ function PrescriptionForm() {
             let days = today.getDate() - birthDate.getDate();
             if (days < 0) { months--; days += new Date(today.getFullYear(), today.getMonth(), 0).getDate(); }
             if (months < 0) { years--; months += 12; }
-            
             updatedPatient.ageYears = years; updatedPatient.ageMonths = months; updatedPatient.ageDays = days;
             updatedPatient.age = years; 
         } 
@@ -126,7 +223,6 @@ function PrescriptionForm() {
         setPatient(updatedPatient);
     };
 
-    // --- HANDLERS: PATIENT SEARCH ---
     const handlePatientSearch = async (e) => {
         const query = e.target.value;
         setPatientSearchQuery(query);
@@ -153,23 +249,23 @@ function PrescriptionForm() {
         } catch (e) { console.error(e); } finally { setIsHistoryLoading(false); }
     };
 
-    // --- HANDLERS: DIAGNOSIS (ICD-11) ---
-    const handleAddDiagnosis = useCallback((newDiagnosis) => {
-        setDiagnosesList(prevList => {
-            // Check for duplicates using the previous list state
-            const exists = prevList.find(d => d.code === newDiagnosis.code);
-            if (!exists) {
-                return [...prevList, newDiagnosis];
-            }
-            return prevList;
-        });
-    }, []);
-
-    const removeDiagnosis = (codeToRemove) => {
-        setDiagnosesList(diagnosesList.filter(d => d.code !== codeToRemove));
+    const handleRePrescribe = (pastPrescriptions) => {
+        if (!window.confirm(`Refill ${pastPrescriptions.length} items?`)) return;
+        const newItems = pastPrescriptions.map(p => ({
+            drug_id: p.drug_id, generic_name: p.generic_name, strength: p.strength, trade_names: p.trade_names,
+            counseling_points: p.counseling_points || '', quantity: p.quantity, sig_instruction: p.sig, duration: p.duration,
+            tempId: Date.now() + Math.random()
+        }));
+        
+        // Filter valid drugs
+        const validItems = newItems.filter(item => item.drug_id);
+        
+        setPrescriptions(prev => [...prev, ...validItems]);
+        setAdvice(pastPrescriptions[0].general_advice || '');
+        alert('Items loaded!');
     };
 
-    // --- HANDLERS: MEDICINE & REFILL ---
+    // --- HANDLERS: MEDICINE ---
     const handleSearch = async (e) => {
         const query = e.target.value;
         setSearchQuery(query);
@@ -183,9 +279,9 @@ function PrescriptionForm() {
     const addDrugToPrescription = (drug) => {
         setPrescriptions([...prescriptions, { ...drug, 
             trade_names: drug.trade_names || '',
-            quantity: '', 
-            sig_instruction: '', 
-            duration: '', tempId: Date.now() }]);
+            manufacturer: drug.manufacturer || '',
+            quantity: '', sig_instruction: '', duration: '', tempId: Date.now() 
+        }]);
         setSearchResults([]); setSearchQuery('');
     };
 
@@ -193,19 +289,9 @@ function PrescriptionForm() {
         setPrescriptions(prescriptions.map(item => item.tempId === id ? { ...item, [field]: val } : item));
     };
 
-    const handleRePrescribe = (pastPrescriptions) => {
-        if (!window.confirm(`Refill ${pastPrescriptions.length} items?`)) return;
-        const newItems = pastPrescriptions.map(p => ({
-            drug_id: p.drug_id, generic_name: p.generic_name, strength: p.strength, trade_names: p.trade_names,
-            counseling_points: p.counseling_points || '', quantity: p.quantity, sig_instruction: p.sig, duration: p.duration,
-            tempId: Date.now() + Math.random()
-        }));
-        setPrescriptions(prev => [...prev, ...newItems]);
-        setAdvice(pastPrescriptions[0].general_advice || '');
-        alert('Items loaded!');
-    };
+    const applyInstructionBlock = (content) => setAdvice(prev => (prev ? prev + '\n\n---\n\n' : '') + content);
 
-    // --- HANDLERS: TEMPLATE CRUD (Simplified Generic) ---
+    // --- HANDLERS: TEMPLATE CRUD ---
     const genericSaveTemplate = async (url, payload, setList, list, editingIdKey, editingItem, setEditingItem, closeModal, typeName) => {
         if (!payload.title || (!payload.instruction && !payload.content)) { alert('Fields required'); return; }
         const id = editingItem?.[editingIdKey];
@@ -239,14 +325,12 @@ function PrescriptionForm() {
         } catch (e) { console.error(e); }
     };
 
-    // Specific Handlers Wrappers
     const handleSaveTemplate = (e) => { e.preventDefault(); genericSaveTemplate(`${VITE_API_URL}/templates/sig`, newTemplate, setSigTemplates, sigTemplates, 'template_id', editingSigTemplate, setEditingSigTemplate, setIsSigModalOpen, 'SIG'); setNewTemplate({title:'', instruction:''}); };
     const handleDeleteTemplate = (id) => genericDeleteTemplate(`${VITE_API_URL}/templates/sig`, id, setSigTemplates, sigTemplates, 'template_id');
     const handleSaveInstructionBlock = (e) => { e.preventDefault(); genericSaveTemplate(`${VITE_API_URL}/templates/instruction`, newInstructionBlock, setInstructionBlocks, instructionBlocks, 'block_id', editingInstructionBlock, setEditingInstructionBlock, setIsInstructionModalOpen, 'Block'); setNewInstructionBlock({title:'', content:''}); };
     const handleDeleteInstructionBlock = (id) => genericDeleteTemplate(`${VITE_API_URL}/templates/instruction`, id, setInstructionBlocks, instructionBlocks, 'block_id');
     
     const applyTemplate = (tempId, instr) => handlePrescriptionItemChange(tempId, 'sig_instruction', instr);
-    const applyInstructionBlock = (content) => setAdvice(prev => (prev ? prev + '\n\n---\n\n' : '') + content);
 
 
     // --- SUBMISSION HANDLER ---
@@ -255,6 +339,14 @@ function PrescriptionForm() {
         if (!prescriptions.length || !patient.name) { 
             alert('Please complete the patient details and add medications.'); 
             setActiveTab('patient'); return; 
+        }
+
+        // 1. Filter out invalid drugs
+        const validPrescriptions = prescriptions.filter(p => p.drug_id);
+        
+        if (!validPrescriptions.length && prescriptions.length > 0) {
+             alert('Error: Selected drugs have invalid IDs. Please remove and re-add them from search.');
+             return;
         }
 
         // Age String
@@ -272,23 +364,37 @@ function PrescriptionForm() {
         ).join('\n');
         
         const payload = {
+            original_date: originalDate, 
             patient: { ...patient, id: patient.id, age: formattedAge },
-            prescriptions: prescriptions.map(p => ({
-                drug_id: p.drug_id, quantity: p.quantity, sig_instruction: p.sig_instruction,
-                duration: p.duration, generic_name: p.generic_name, strength: p.strength, counseling_points: p.counseling_points, trade_names: p.trade_names,
+            prescriptions: validPrescriptions.map(p => ({
+                drug_id: p.drug_id, 
+                quantity: p.quantity, 
+                sig_instruction: p.sig_instruction,
+                duration: p.duration, 
+                generic_name: p.generic_name, 
+                strength: p.strength, 
+                trade_names: p.trade_names,
+                manufacturer: p.manufacturer,
+                counseling_points: p.counseling_points 
             })),
             chief_complaint: chiefComplaint,
             medical_history: history,
             examination_findings: exam, 
             investigations: investigations,
-            diagnosis_text: formattedDiagnosisString, // Send string
+            diagnosis_text: formattedDiagnosisString, 
             general_advice: advice,
             follow_up_date: followUp
         };
 
+        const url = originalDate 
+            ? `${VITE_API_URL}/prescriptions/update` 
+            : `${VITE_API_URL}/prescriptions`;
+        
+        const method = originalDate ? 'PUT' : 'POST';
+
         try {
-            const res = await fetch(`${VITE_API_URL}/prescriptions`, {
-                method: 'POST',
+            const res = await fetch(url, {
+                method: method,
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
                 body: JSON.stringify(payload),
             });
@@ -297,20 +403,20 @@ function PrescriptionForm() {
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a'); a.href = url; a.download = 'prescription.pdf'; document.body.appendChild(a); a.click(); window.URL.revokeObjectURL(url);
                 
-                // --- RESET FORM ---
-                setPatient({ name: '', gender: 'Male', id: null, dob: '', ageYears: '', ageMonths: '', ageDays: '', mobile: '', email: '', address: '', referred_by: '' });
-                setPrescriptions([]);
-                
-                // Clear Notes & Assessment
-                setDiagnosesList([]); // <--- FIXED: Clear the tags
-                setAdvice('');
-                setChiefComplaint('');
-                setHistory('');
-                setInvestigations('');
-                setFollowUp('');
-                setExam({ bp: '', pulse: '', temp: '', weight: '', height: '', bmi: '', spo2: '', other: '' });
-                
-                // alert('Prescription Generated!'); 
+                alert(originalDate ? 'Updated & Printed!' : 'Created & Printed!');
+
+                // Redirect to Patient Record to view updated history
+                if (patient.id) {
+                    navigate(`/patients/${patient.id}`);
+                } else {
+                    // Fallback reset
+                    setPatient({ name: '', gender: 'Male', id: null, dob: '', ageYears: '', ageMonths: '', ageDays: '', mobile: '', email: '', address: '', referred_by: '' });
+                    setPrescriptions([]);
+                    setDiagnosesList([]);
+                    setAdvice(''); setChiefComplaint(''); setHistory(''); setInvestigations(''); setFollowUp('');
+                    setExam({ bp: '', pulse: '', temp: '', weight: '', height: '', bmi: '', spo2: '', other: '' });
+                    setOriginalDate(null);
+                }
             } else {
                 alert('Error generating prescription');
             }
@@ -327,7 +433,16 @@ function PrescriptionForm() {
 
     return (
         <div className="max-w-5xl mx-auto p-4 my-8 bg-white rounded-xl shadow-xl min-h-[600px] flex flex-col">
-            <h2 className="text-2xl font-bold text-indigo-700 mb-4 px-2">New Prescription</h2>
+            <div className="flex justify-between items-center mb-6 px-2 border-b pb-2">
+                <h2 className="text-2xl font-bold text-indigo-700">
+                    {originalDate ? "Edit Prescription" : "New Prescription"}
+                </h2>
+                {originalDate && (
+                    <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full font-semibold">
+                        Editing Mode
+                    </span>
+                )}
+            </div>
             
             {/* TABS */}
             <div className="flex border-b border-gray-200 mb-6 overflow-x-auto">
@@ -414,7 +529,7 @@ function PrescriptionForm() {
                         <div className="flex justify-between mt-6 pt-4">
                             <button onClick={() => setActiveTab('medication')} className="text-gray-600 px-4 py-2">&larr; Back</button>
                             <button onClick={handleSubmit} className="bg-green-600 text-white font-bold text-lg px-8 py-3 rounded-md shadow-lg hover:bg-green-700 transition">
-                                Generate Prescription
+                                {originalDate ? "Update & Print" : "Generate Prescription"}
                             </button>
                         </div>
                     </div>
