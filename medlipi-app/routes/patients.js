@@ -6,43 +6,122 @@ const router = express.Router();
 router.use(verifyToken); 
 
 // --- GET All Patients (Paginated Search) ---
+// router.get('/', async (req, res) => {
+//     const { q, page = 1, limit = 20 } = req.query;
+//     const offset = (page - 1) * limit;
+//     const doctorId = req.doctor.id;
+//     const searchTerm = q ? `%${q}%` : '%';
+
+//     try {
+//         const query = `
+//             SELECT 
+//                 p.patient_id, p.name, p.age, p.gender,
+//                 MAX(pr.created_at) as last_visit
+//             FROM patients p
+//             JOIN prescriptions pr ON p.patient_id = pr.patient_id
+//             WHERE pr.doctor_id = ? AND p.name LIKE ?
+//             GROUP BY p.patient_id
+//             ORDER BY last_visit DESC
+//             LIMIT ? OFFSET ?
+//         `;
+        
+//         const countQuery = `
+//             SELECT COUNT(DISTINCT p.patient_id) as total
+//             FROM patients p
+//             JOIN prescriptions pr ON p.patient_id = pr.patient_id
+//             WHERE pr.doctor_id = ? AND p.name LIKE ?
+//         `;
+
+//         const [patients] = await pool.query(query, [doctorId, searchTerm, parseInt(limit), parseInt(offset)]);
+//         const [countResult] = await pool.query(countQuery, [doctorId, searchTerm]);
+
+//         res.json({
+//             data: patients,
+//             pagination: {
+//                 total: countResult[0].total,
+//                 page: parseInt(page),
+//                 pages: Math.ceil(countResult[0].total / limit)
+//             }
+//         });
+//     } catch (error) {
+//         console.error('Error fetching patients:', error);
+//         res.status(500).json({ message: 'Server error.' });
+//     }
+// });
+
+// --- GET All Patients (Search + Filter + Pagination) ---
 router.get('/', async (req, res) => {
-    const { q, page = 1, limit = 20 } = req.query;
+    const { 
+        q, page = 1, limit = 10, 
+        gender, address, diagnosis, 
+        startDate, endDate // <--- New Params
+    } = req.query;
+
     const offset = (page - 1) * limit;
     const doctorId = req.doctor.id;
     const searchTerm = q ? `%${q}%` : '%';
 
     try {
-        const query = `
+        // Base Query Logic
+        let whereClause = `
+            WHERE pr.doctor_id = ? 
+            AND (p.name LIKE ? OR p.mobile LIKE ?)
+        `;
+        const params = [doctorId, searchTerm, searchTerm];
+
+        // --- DYNAMIC FILTERS ---
+        if (gender) { whereClause += ` AND p.gender = ?`; params.push(gender); }
+        if (address) { whereClause += ` AND p.address LIKE ?`; params.push(`%${address}%`); }
+        if (diagnosis) { whereClause += ` AND pr.diagnosis_text LIKE ?`; params.push(`%${diagnosis}%`); }
+        
+        // --- DATE FILTERS (NEW) ---
+        if (startDate) { 
+            whereClause += ` AND DATE(pr.created_at) >= ?`; 
+            params.push(startDate); 
+        }
+        if (endDate) { 
+            whereClause += ` AND DATE(pr.created_at) <= ?`; 
+            params.push(endDate); 
+        }
+
+        // --- 1. DATA QUERY ---
+        const sql = `
             SELECT 
-                p.patient_id, p.name, p.age, p.gender,
+                p.patient_id, p.name, p.age, p.gender, p.mobile, p.address,
                 MAX(pr.created_at) as last_visit
             FROM patients p
-            JOIN prescriptions pr ON p.patient_id = pr.patient_id
-            WHERE pr.doctor_id = ? AND p.name LIKE ?
+            LEFT JOIN prescriptions pr ON p.patient_id = pr.patient_id
+            ${whereClause}
             GROUP BY p.patient_id
             ORDER BY last_visit DESC
             LIMIT ? OFFSET ?
         `;
         
-        const countQuery = `
+        // --- 2. COUNT QUERY ---
+        const countSql = `
             SELECT COUNT(DISTINCT p.patient_id) as total
             FROM patients p
-            JOIN prescriptions pr ON p.patient_id = pr.patient_id
-            WHERE pr.doctor_id = ? AND p.name LIKE ?
+            LEFT JOIN prescriptions pr ON p.patient_id = pr.patient_id
+            ${whereClause}
         `;
 
-        const [patients] = await pool.query(query, [doctorId, searchTerm, parseInt(limit), parseInt(offset)]);
-        const [countResult] = await pool.query(countQuery, [doctorId, searchTerm]);
+        // Add limit/offset to params ONLY for the data query
+        const dataParams = [...params, parseInt(limit), parseInt(offset)];
+        const countParams = [...params];
+
+        const [patients] = await pool.query(sql, dataParams);
+        const [countResult] = await pool.query(countSql, countParams);
 
         res.json({
             data: patients,
             pagination: {
                 total: countResult[0].total,
-                page: parseInt(page),
-                pages: Math.ceil(countResult[0].total / limit)
+                currentPage: parseInt(page),
+                totalPages: Math.ceil(countResult[0].total / limit),
+                limit: parseInt(limit)
             }
         });
+
     } catch (error) {
         console.error('Error fetching patients:', error);
         res.status(500).json({ message: 'Server error.' });
