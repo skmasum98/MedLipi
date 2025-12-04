@@ -28,7 +28,8 @@ function Header() {
                         {/* Always visible links (for unauthenticated users) */}
                         {!isAuthenticated && (
                             <>
-                                <Link to="/login" className={linkClasses}>Login</Link>
+                                <Link to="/patient/login" className={linkClasses}>Patient Login</Link>
+                                <Link to="/login" className={linkClasses}>Doctor Login</Link>
                                 <Link to="/register" className={`${linkClasses} bg-indigo-600 hover:bg-indigo-500`}>Register</Link>
                             </>
                         )}

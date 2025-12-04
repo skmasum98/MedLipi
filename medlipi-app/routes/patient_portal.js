@@ -1,0 +1,89 @@
+import express from 'express';
+import pool from '../db.js';
+import jwt from 'jsonwebtoken';
+
+const router = express.Router();
+
+// --- 1. PATIENT LOGIN (ID + Mobile) ---
+router.post('/login', async (req, res) => {
+    const { patient_id, mobile } = req.body;
+
+    if (!patient_id || !mobile) {
+        return res.status(400).json({ message: 'Patient ID and Mobile are required.' });
+    }
+
+    try {
+        // Verify User exists matching BOTH ID and Mobile
+        const [rows] = await pool.query(
+            'SELECT * FROM patients WHERE patient_id = ? AND mobile = ?', 
+            [patient_id, mobile]
+        );
+
+        if (rows.length === 0) {
+            return res.status(401).json({ message: 'Invalid Credentials. Check the ID on your prescription.' });
+        }
+
+        const patient = rows[0];
+
+        // Generate Patient-Specific Token
+        // distinct secret or same secret is fine, but we tag role='patient'
+        const token = jwt.sign(
+            { id: patient.patient_id, role: 'patient', name: patient.name },
+            process.env.JWT_SECRET,
+            { expiresIn: '30d' } 
+        );
+
+        res.json({ 
+            token,
+            patient: { id: patient.patient_id, name: patient.name, mobile: patient.mobile }
+        });
+
+    } catch (error) {
+        console.error("Patient Login Error:", error);
+        res.status(500).json({ message: 'Login error' });
+    }
+});
+
+// --- Middleware: Verify PATIENT Token ---
+const verifyPatientToken = (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ message: 'No token provided' });
+
+    const token = authHeader.split(' ')[1];
+    
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+        if (err) return res.status(403).json({ message: 'Invalid token' });
+        if (decoded.role !== 'patient') return res.status(403).json({ message: 'Not authorized as patient' });
+        
+        req.patientId = decoded.id;
+        next();
+    });
+};
+
+// --- 2. GET MY HISTORY ---
+router.get('/my-history', verifyPatientToken, async (req, res) => {
+    try {
+        // We group by public_uid to show unique visits
+        // We link to public_uid for the download link
+        const query = `
+            SELECT 
+                p.public_uid, 
+                MAX(p.created_at) as visit_date, 
+                MAX(p.diagnosis_text) as diagnosis,
+                MAX(d.clinic_name) as clinic,
+                MAX(d.full_name) as doctor_name
+            FROM prescriptions p
+            JOIN doctors d ON p.doctor_id = d.doctor_id
+            WHERE p.patient_id = ?
+            GROUP BY p.public_uid
+            ORDER BY visit_date DESC
+        `;
+        const [rows] = await pool.query(query, [req.patientId]);
+        res.json(rows);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+export default router;

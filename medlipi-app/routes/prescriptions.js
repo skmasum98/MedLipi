@@ -1,7 +1,9 @@
 import express from 'express';
 import pool from '../db.js';
 import PDFDocument from 'pdfkit';
-import verifyToken from '../middleware/auth.js'; 
+import verifyToken from '../middleware/auth.js';
+import { v4 as uuidv4 } from 'uuid'; 
+import QRCode from 'qrcode';
 
 const router = express.Router();
 router.use(verifyToken);
@@ -12,13 +14,13 @@ router.get('/recent', async (req, res) => {
     try {
         const query = `
             SELECT 
-                p.patient_id, pt.name, pt.age, pt.gender, 
-                MAX(p.created_at) as visit_date,
-                MAX(p.diagnosis_text) as diagnosis
-            FROM prescriptions p
-            JOIN patients pt ON p.patient_id = pt.patient_id
-            WHERE p.doctor_id = ?
-            GROUP BY p.patient_id, pt.name, pt.age, pt.gender, DATE(p.created_at) 
+                p.patient_id, p.name, p.age, p.gender, 
+                MAX(pr.created_at) as visit_date,
+                MAX(pr.diagnosis_text) as diagnosis
+            FROM prescriptions pr
+            JOIN patients p ON pr.patient_id = p.patient_id
+            WHERE pr.doctor_id = ?
+            GROUP BY p.patient_id, p.name, p.age, p.gender, DATE(pr.created_at) 
             ORDER BY visit_date DESC
             LIMIT 10
         `;
@@ -40,8 +42,9 @@ router.post('/', async (req, res) => {
     
     const doctorId = req.doctor.id; 
     
-    // FIX 1: Generate ONE timestamp for the whole batch so they group perfectly
+    // Generate Metadata
     const batchDate = new Date(); 
+    const publicUid = uuidv4(); // Unique ID for QR
 
     let connection;
 
@@ -66,38 +69,46 @@ router.post('/', async (req, res) => {
 
         // 2. Insert Prescriptions
         for (const drug of prescriptions) {
-             if (!drug.drug_id) continue; // Skip invalid
+             if (!drug.drug_id) continue;
 
             const prescriptionQuery = `
                 INSERT INTO prescriptions 
                 (doctor_id, patient_id, drug_id, quantity, sig_instruction, duration, 
                  diagnosis_text, general_advice, chief_complaint, medical_history, 
-                 examination_findings, investigations, follow_up_date, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 examination_findings, investigations, follow_up_date, created_at, public_uid)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
 
             const examString = typeof examination_findings === 'object' ? JSON.stringify(examination_findings) : examination_findings;
 
-            // FIX 1 APPLIED: Pass batchDate as the last parameter
             await connection.query(prescriptionQuery, [
                 doctorId, patientId, drug.drug_id, drug.quantity, drug.sig_instruction, drug.duration,
                 diagnosis_text, general_advice, chief_complaint, medical_history, 
-                examString, investigations, follow_up_date, batchDate
+                examString, investigations, follow_up_date, batchDate, publicUid
             ]);
         }
 
         await connection.commit();
 
-        // 3. Generate PDF
+        // 3. Generate QR Code
+        const publicLink = `${process.env.DOMAIN || 'http://localhost:5173'}/p/${publicUid}`; 
+        const qrCodeDataUrl = await QRCode.toDataURL(publicLink);
+
+        // 4. Generate PDF
         const [docRows] = await pool.query('SELECT * FROM doctors WHERE doctor_id = ?', [doctorId]);
         
+        // Pass "patientId" explicitly calculated above, not just what came from req.body
+        const patientDataForPdf = { ...patient, id: patientId };
+
         generatePrescriptionPDF(res, {
             doctor: docRows[0], 
-            patient: { id: patientId, ...patient },
+            patient: patientDataForPdf,
             prescriptions,
             diagnosis_text, general_advice, chief_complaint, medical_history,
             examination_findings: typeof examination_findings === 'object' ? examination_findings : JSON.parse(examination_findings || '{}'),
-            investigations, follow_up_date
+            investigations, follow_up_date,
+            qrCodeDataUrl, // Pass QR
+            publicLink
         });
 
     } catch (error) {
@@ -112,26 +123,29 @@ router.post('/', async (req, res) => {
 // --- PUT Update/Edit Prescription ---
 router.put('/update', async (req, res) => {
     const { 
-        original_date, // Timestamp of the old batch
+        original_date,
         patient, prescriptions, diagnosis_text, general_advice, 
         chief_complaint, medical_history, examination_findings, 
         investigations, follow_up_date 
     } = req.body;
     
     const doctorId = req.doctor.id;
-    const batchDate = new Date(); // New timestamp for the updated batch
+    const batchDate = new Date(); 
+    
+    // FIX: Must generate NEW public_uid and QR for the updated version
+    const publicUid = uuidv4(); 
+
     let connection;
 
     try {
         connection = await pool.getConnection();
         await connection.beginTransaction();
 
-        // 1. DELETE OLD ENTRIES (Using exact original timestamp)
-        // Note: Use string format if needed, but usually Date object works with mysql2
+        // 1. DELETE OLD
         const deleteQuery = `DELETE FROM prescriptions WHERE patient_id = ? AND doctor_id = ? AND created_at = ?`;
         await connection.query(deleteQuery, [patient.id, doctorId, original_date]);
 
-        // 2. INSERT NEW ENTRIES
+        // 2. INSERT NEW (With public_uid)
         for (const drug of prescriptions) {
             if (!drug.drug_id) continue;
 
@@ -139,21 +153,24 @@ router.put('/update', async (req, res) => {
                 INSERT INTO prescriptions 
                 (doctor_id, patient_id, drug_id, quantity, sig_instruction, duration, 
                  diagnosis_text, general_advice, chief_complaint, medical_history, 
-                 examination_findings, investigations, follow_up_date, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 examination_findings, investigations, follow_up_date, created_at, public_uid)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             const examString = typeof examination_findings === 'object' ? JSON.stringify(examination_findings) : examination_findings;
             
             await connection.query(insertQuery, [
                 doctorId, patient.id, drug.drug_id, drug.quantity, drug.sig_instruction, drug.duration,
                 diagnosis_text, general_advice, chief_complaint, medical_history, 
-                examString, investigations, follow_up_date, batchDate
+                examString, investigations, follow_up_date, batchDate, publicUid // <--- Added publicUid
             ]);
         }
 
         await connection.commit();
         
-        // 3. FETCH DETAILS & GENERATE PDF (FIX 2: Actually return the PDF)
+        // 3. GENERATE QR & PDF
+        const publicLink = `${process.env.DOMAIN || 'http://localhost:5173'}/p/${publicUid}`; 
+        const qrCodeDataUrl = await QRCode.toDataURL(publicLink);
+
         const [docRows] = await pool.query('SELECT * FROM doctors WHERE doctor_id = ?', [doctorId]);
         
         generatePrescriptionPDF(res, {
@@ -162,7 +179,8 @@ router.put('/update', async (req, res) => {
             prescriptions,
             diagnosis_text, general_advice, chief_complaint, medical_history,
             examination_findings: typeof examination_findings === 'object' ? examination_findings : JSON.parse(examination_findings || '{}'),
-            investigations, follow_up_date
+            investigations, follow_up_date,
+            qrCodeDataUrl // Pass QR
         });
 
     } catch (error) {
@@ -174,18 +192,16 @@ router.put('/update', async (req, res) => {
     }
 });
 
-// --- POST Reprint Old Prescription ---
+// --- POST Reprint ---
 router.post('/reprint/:patientId', async (req, res) => {
-    const { date } = req.body; // Incoming ISO String (e.g., 2025-12-03T10:00:00.000Z)
+    const { date } = req.body; 
     const patientId = req.params.patientId;
     const doctorId = req.doctor.id;
 
     try {
-        // Convert the incoming ISO string to a JavaScript Date object
         const targetDate = new Date(date);
 
-        // FIX: Use a time range check (+/- 2 seconds) instead of exact '='
-        // This handles timezone conversions and slight format differences safely
+        // FIX: Also Select public_uid to regenerate the EXACT same QR code if possible
         const query = `
             SELECT 
                 pr.*, d.generic_name, d.trade_names, d.strength, d.counseling_points as drug_counseling
@@ -196,28 +212,21 @@ router.post('/reprint/:patientId', async (req, res) => {
             AND pr.created_at BETWEEN DATE_SUB(?, INTERVAL 2 SECOND) AND DATE_ADD(?, INTERVAL 2 SECOND)
         `;
         
-        // Pass the Date object 3 times (PatientID, DoctorID, Date, Date)
         const [rows] = await pool.query(query, [patientId, doctorId, targetDate, targetDate]);
 
-        if (rows.length === 0) {
-            console.log("Reprint debug: No rows found for date:", targetDate);
-            return res.status(404).json({ message: 'Prescription not found (Date mismatch).' });
-        }
+        if (rows.length === 0) return res.status(404).json({ message: 'Prescription not found (Date mismatch).' });
 
-        // 2. Fetch Patient & Doctor details
         const [ptRows] = await pool.query('SELECT * FROM patients WHERE patient_id = ?', [patientId]);
-        const [docRows] = await pool.query('SELECT full_name, bmdc_reg, email, degree, clinic_name, chamber_address, phone_number, specialist_title FROM doctors WHERE doctor_id = ?', [doctorId]);
+        const [docRows] = await pool.query('SELECT * FROM doctors WHERE doctor_id = ?', [doctorId]);
 
-        // 3. Format Data for PDF
-        const base = rows[0];
+        const base = rows[0]; 
         
-        // Safely parse JSON findings
-        let parsedFindings = {};
-        try {
-            parsedFindings = typeof base.examination_findings === 'object' 
-                ? base.examination_findings 
-                : JSON.parse(base.examination_findings || '{}');
-        } catch (e) { console.error("JSON parse error", e); }
+        // FIX: Re-Generate QR Code using the stored public_uid
+        let qrCodeDataUrl = null;
+        if (base.public_uid) {
+             const publicLink = `${process.env.DOMAIN || 'http://localhost:5173'}/p/${base.public_uid}`;
+             qrCodeDataUrl = await QRCode.toDataURL(publicLink);
+        }
 
         const pdfData = {
             doctor: docRows[0],
@@ -228,7 +237,8 @@ router.post('/reprint/:patientId', async (req, res) => {
             medical_history: base.medical_history,
             investigations: base.investigations,
             follow_up_date: base.follow_up_date,
-            examination_findings: parsedFindings,
+            examination_findings: JSON.parse(base.examination_findings || '{}'),
+            qrCodeDataUrl, // Pass Re-generated QR
             prescriptions: rows.map(r => ({
                 trade_names: r.trade_names,
                 generic_name: r.generic_name,
@@ -256,9 +266,6 @@ const generatePrescriptionPDF = (res, data) => {
     res.setHeader('Content-Disposition', `attachment; filename="Prescription_${data.patient.name}.pdf"`);
     doc.pipe(res);
 
-    // ... (Paste your existing PDF layout code here) ...
-    // ... (Header, Patient Info, Columns, etc.) ...
-    
     // --- HEADER (Clinic & Doctor) ---
     if (data.doctor.clinic_name) {
         doc.fontSize(20).fillColor('#2c3e50').text(data.doctor.clinic_name, 40, 40);
@@ -268,17 +275,22 @@ const generatePrescriptionPDF = (res, data) => {
     const startX = 350;
     doc.fontSize(14).fillColor('#000').text(`Dr. ${data.doctor.full_name}`, startX, 40, { align: 'right' });
     doc.fontSize(10).fillColor('#333').text(data.doctor.degree || '', startX, 60, { align: 'right' });
+    doc.fontSize(9).fillColor('#666').text(data.doctor.specialist_title || '', startX, 75, { align: 'right' });
     doc.text(`BMDC: ${data.doctor.bmdc_reg}`, startX, 90, { align: 'right' });
 
     doc.moveDown(1.5);
     doc.lineWidth(1).strokeColor('#ccc').moveTo(40, 110).lineTo(555, 110).stroke();
 
-    // Patient Info
+    // --- PATIENT INFO BAR (FIXED TO SHOW ID) ---
     doc.y = 115;
     doc.fontSize(10).fillColor('#000');
-    doc.text(`Name: ${data.patient.name}`, 40, 120);
-    doc.text(`Age: ${data.patient.age || '--'}    Sex: ${data.patient.gender}`, 250, 120);
+    
+    // FIX: ADDED ID DISPLAY HERE
+    doc.text(`Name: ${data.patient.name}   [ID: ${data.patient.id || data.patient.patient_id}]`, 40, 120); 
+    
+    doc.text(`Age: ${data.patient.age || '--'}    Sex: ${data.patient.gender}`, 320, 120); // Moved X slightly to fit ID
     doc.text(`Date: ${new Date().toLocaleDateString()}`, 450, 120, { align: 'right' });
+    
     doc.lineWidth(2).strokeColor('#2c3e50').moveTo(40, 140).lineTo(555, 140).stroke();
 
     // Layout Columns
@@ -300,11 +312,18 @@ const generatePrescriptionPDF = (res, data) => {
     
     const ef = data.examination_findings || {};
     let findingsText = '';
-    if (ef.bp) findingsText += `BP: ${ef.bp}\n`;
+    if (ef.bp) findingsText += `BP: ${ef.bp} mmHg\n`;
+    if (ef.pulse) findingsText += `Pulse: ${ef.pulse} bpm\n`;
+    if (ef.temp) findingsText += `Temp: ${ef.temp} F\n`;
     if (ef.weight) findingsText += `Wt: ${ef.weight} kg\n`;
-    // ... add other vitals
+    if (ef.height) findingsText += `Ht: ${ef.height}\n`;
+    if (ef.bmi) findingsText += `BMI: ${ef.bmi}\n`;
+    if (ef.spo2) findingsText += `SpO2: ${ef.spo2} %\n`;
+    if (ef.other) findingsText += `\n${ef.other}`;
+
     printLeftSection('O/E', findingsText);
     printLeftSection('History', data.medical_history);
+    printLeftSection('Investigations', data.investigations);
     printLeftSection('Diagnosis', data.diagnosis_text);
 
     // RIGHT COL
@@ -326,6 +345,11 @@ const generatePrescriptionPDF = (res, data) => {
         doc.fontSize(10).font('Helvetica').fillColor('#000')
            .text(`${item.sig_instruction} -- ${item.duration}`, rightColX + 15, doc.y + 2);
         
+        if (item.counseling_points) {
+            doc.fontSize(8).font('Helvetica-Oblique').fillColor('#666')
+               .text(`Note: ${item.counseling_points}`, rightColX + 15, doc.y + 2);
+        }
+
         rightY = doc.y + 12; 
     });
 
@@ -334,7 +358,27 @@ const generatePrescriptionPDF = (res, data) => {
         doc.fontSize(11).font('Helvetica-Bold').fillColor('#2c3e50').text('Advice', rightColX, rightY);
         rightY += 15;
         doc.fontSize(10).font('Helvetica').fillColor('#333').text(data.general_advice, rightColX, rightY, { width: rightColWidth });
+        rightY = doc.y + 20;
     }
+    
+    if (data.follow_up_date) {
+        doc.fontSize(11).font('Helvetica-Bold').fillColor('#2c3e50').text('Follow-up', rightColX, rightY);
+        rightY += 15;
+        doc.fontSize(10).font('Helvetica').fillColor('#333').text(data.follow_up_date, rightColX, rightY);
+    }
+
+    // Divider Line
+    const maxY = Math.max(leftY, rightY, 680); 
+    doc.lineWidth(0.5).strokeColor('#ddd').moveTo(200, 160).lineTo(200, maxY).stroke();
+
+    // Footer with QR
+    const bottomY = 730;
+    if (data.qrCodeDataUrl) {
+        doc.image(data.qrCodeDataUrl, 500, bottomY, { width: 50 });
+        doc.fontSize(8).fillColor('#555').text('Scan for e-copy', 430, bottomY + 50, { align: 'right' });
+    }
+    
+    doc.text('Powered by MedLipi', 40, bottomY + 30, { align: 'left' });
 
     doc.end();
 };

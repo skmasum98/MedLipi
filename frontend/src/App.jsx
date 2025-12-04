@@ -1,9 +1,11 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router';
-import { AuthProvider, useAuth } from './hooks/useAuth'; // Import Auth Provider and Hook
-import ProtectedRoute from './components/ProtectedRoute'; // Import ProtectedRoute
-import Header from './components/Header';
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router'; // FIXED IMPORT
+import { AuthProvider, useAuth } from './hooks/useAuth'; 
+import ProtectedRoute from './components/ProtectedRoute'; 
+import Header from './components/Header'; 
 
+// --- Pages Imports ---
+import Home from './pages/Home'; // Landing Page
 import Login from './pages/Login';
 import Register from './pages/Register';
 import PrescriptionForm from './pages/PrescriptionForm';
@@ -12,18 +14,79 @@ import Settings from './pages/Settings';
 import Inventory from './pages/Inventory';
 import Patients from './pages/Patients';
 import PatientRecord from './pages/PatientRecord';
+import PatientLogin from './pages/PatientLogin';
+import PatientDashboard from './pages/PatientDashboard';
+import PublicDownload from './pages/PublicDownload';
 
-// --- Simple Component to show Doctor info and Logout ---
-function DoctorProfile() {
-    const { doctor, logout } = useAuth();
+// --- Layout Component ---
+// Handles conditional rendering of the Header and main container styles
+function Layout() {
+    const location = useLocation();
     
+    // Paths where the Doctor Navigation/Header should NOT appear
+    const noHeaderPaths = [
+        '/',                // Landing Page
+        '/login',           // Doctor Login
+        '/register',        // Doctor Register
+        '/patient/login',   // Patient Login
+        '/my-health'        // Patient Dashboard
+    ];
+
+    // Check if current path is in the list OR if it starts with '/p/' (Public Download)
+    const isPublicDownload = location.pathname.startsWith('/p/');
+    const showHeader = !noHeaderPaths.includes(location.pathname) && !isPublicDownload;
+
     return (
-        <div style={{ padding: '20px' }}>
-            <h2>Welcome back, Dr. {doctor?.full_name}!</h2>
-            <p>BMDC Reg: {doctor?.bmdc_reg}</p>
-            <p>Degree: {doctor?.degree}</p>
-            <button onClick={logout}>Logout</button>
-        </div>
+        <>
+            {/* Show Header only for Doctor Protected Routes */}
+            {showHeader && <Header />}
+            
+            {/* Apply padding/background styling only for dashboard pages */}
+            <main className={showHeader ? "pt-4 pb-10 bg-gray-50 min-h-screen" : "min-h-screen"}>
+                <Routes>
+                    {/* --- PUBLIC ROUTES --- */}
+                    <Route path="/" element={<Home />} />
+                    <Route path="/register" element={<Register />} />
+                    <Route path="/login" element={<Login />} /> 
+                    
+                    {/* Plan A: QR Code Public Download */}
+                    <Route path="/p/:uid" element={<PublicDownload />} /> 
+
+                    {/* Plan B: Patient Portal */}
+                    <Route path="/patient/login" element={<PatientLogin />} />
+                    <Route path="/my-health" element={<PatientDashboard />} />
+
+                    {/* --- DOCTOR PROTECTED ROUTES --- */}
+                    <Route 
+                        path="/dashboard" 
+                        element={<ProtectedRoute><Dashboard /></ProtectedRoute>} 
+                    />
+                    <Route 
+                        path="/prescription/new" 
+                        element={<ProtectedRoute><PrescriptionForm /></ProtectedRoute>} 
+                    />
+                    <Route 
+                        path="/inventory" 
+                        element={<ProtectedRoute><Inventory /></ProtectedRoute>} 
+                    />
+                    <Route 
+                        path="/profile" 
+                        element={<ProtectedRoute><Settings /></ProtectedRoute>} 
+                    />
+                    <Route 
+                        path="/patients" 
+                        element={<ProtectedRoute><Patients /></ProtectedRoute>} 
+                    />
+                    <Route 
+                        path="/patients/:id" 
+                        element={<ProtectedRoute><PatientRecord /></ProtectedRoute>} 
+                    />
+                                        
+                    {/* Catch-all Redirect */}
+                    <Route path="*" element={<HomeRedirect />} />
+                </Routes>
+            </main>
+        </>
     );
 }
 
@@ -31,64 +94,21 @@ function DoctorProfile() {
 function App() {
     return (
         <Router>
-            {/* Wrap the entire App logic in the AuthProvider */}
             <AuthProvider>
-                <Header />
-                <main className="pt-4 pb-10 min-w-0 min-h-0">
-                <Routes>
-                    <Route path="/register" element={<Register />} />
-                    {/* Login component uses the login function from context */}
-                    <Route path="/login" element={<Login />} /> 
-                    {/* --- DASHBOARD ROUTE (Home Base) --- */}
-                        <Route 
-                            path="/dashboard" 
-                            element={<ProtectedRoute><Dashboard /></ProtectedRoute>} 
-                        />
-
-                        {/* --- PRESCRIPTION FORM ROUTE --- */}
-                        <Route 
-                            path="/prescription/new" 
-                            element={<ProtectedRoute><PrescriptionForm /></ProtectedRoute>} 
-                        />
-                        
-                    
-                    <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
-                                        
-                    <Route path="*" element={<HomeRedirect />} />
-
-                    <Route path="/profile" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-                    <Route path="/patients" element={<ProtectedRoute><Patients /></ProtectedRoute>} />
-                    <Route path="/patients/:id" element={<ProtectedRoute><PatientRecord /></ProtectedRoute>} />
-                </Routes>
-                </main>
+                <Layout />
             </AuthProvider>
         </Router>
     );
 }
 
-// Helper component for Navigation Links
-function Nav() {
-    const { isAuthenticated, logout } = useAuth();
-    return (
-        <nav style={{ padding: '10px', background: '#f0f0f0' }}>
-            <Link to="/login" style={{ marginRight: '15px' }}>Login</Link>
-            <Link to="/register" style={{ marginRight: '15px' }}>Register</Link>
-            {isAuthenticated && (
-                <>
-                    <Link to="/dashboard" style={{ marginRight: '15px' }}>New Prescription</Link>
-                    <Link to="/profile" style={{ marginRight: '15px' }}>Profile</Link>
-                    <button onClick={logout}>Logout (Nav)</button>
-                </>
-            )}
-        </nav>
-    );
-}
-
-// Helper component to redirect unauthenticated/authenticated users
+// --- Helper: Redirect Logic ---
+// Redirects unknown URLs: 
+// - If logged in: Go to Dashboard
+// - If not logged in: Go to Login (or Home '/')
 function HomeRedirect() {
     const { isAuthenticated, isLoading } = useAuth();
     
-    if (isLoading) return <div>Loading...</div>; // Wait for auth status
+    if (isLoading) return <div className="p-10 text-center text-gray-500">Loading App...</div>; 
     
     return <Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />;
 }
