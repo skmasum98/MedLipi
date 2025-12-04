@@ -32,4 +32,5 @@
 | **24** | **Full** | Trade Name Search | Implement robust search logic allowing doctors to search by **Trade Name** and get the Generic match. | P3 | Back-end |
 | **25** | **Full** | Refill Feature | Add "Refill" button to past prescriptions to generate a new, identical prescription in one click. | P3 | Full Stack |
 | **26** | **Full** | ICD-10 Link | Implement a small `diagnosis_codes` table and allow linking a diagnosis to the prescription. | P3 | Full Stack |
-| **27** | **Full** | Documentation | Prepare comprehensive technical documentation and user guides for the open-source community. | P3 | Full Stack |
+| **27** | **Full** | Patient's Portal | QR code, and patient login download prescription | P3 | Full Stack |
+| **28** | **Full** | Documentation | Prepare comprehensive technical documentation and user guides for the open-source community. | P3 | Full Stack |
