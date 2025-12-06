@@ -110,7 +110,7 @@ function AssessmentPanel({
 
             {/* --- BOTTOM SECTION: DIAGNOSIS --- */}
             <div className="border-t border-gray-200 pt-6">
-                <div className="relative z-50"> 
+                <div className="z-50"> 
                     <ICD11Search onSelect={handleAddDiagnosis} />
                 </div>
 
