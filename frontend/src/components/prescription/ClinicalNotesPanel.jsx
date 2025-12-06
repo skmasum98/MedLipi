@@ -1,9 +1,11 @@
-// frontend/src/components/prescription/ClinicalNotesPanel.jsx
-import React from 'react';
+import React, { useState } from 'react';
 import Modal from '../Modal';
+import { useAuth } from '../../hooks/useAuth'; // Import Auth for token
+
+const VITE_API_URL = import.meta.env.VITE_API_URL;
 
 function ClinicalNotesPanel({
-     // Advice Props
+    // Advice Props
     advice, setAdvice,
     
     // Instruction Block Props
@@ -11,8 +13,53 @@ function ClinicalNotesPanel({
     
     // Modal Props
     isInstructionModalOpen, handleSaveInstructionBlock, handleDeleteInstructionBlock,
-    editingInstructionBlock, setEditingInstructionBlock, newInstructionBlock, setNewInstructionBlock
+    editingInstructionBlock, setEditingInstructionBlock, newInstructionBlock, setNewInstructionBlock,
+
+    // NEW PROPS for AI Context (passed from parent)
+    diagnosisList, // List of diagnoses (array)
+    prescriptions  // List of meds (array)
 }) {
+    const { token } = useAuth();
+    const [isGenerating, setIsGenerating] = useState(false);
+
+    // --- AI Handler ---
+    const handleGenerateAI = async () => {
+        // Validation
+        const diagnosisText = diagnosisList?.map(d => d.description).join(', ');
+        if (!diagnosisText && (!prescriptions || prescriptions.length === 0)) {
+            alert("Please add a Diagnosis or Medication first so the AI knows what to advise!");
+            return;
+        }
+
+        setIsGenerating(true);
+        try {
+            const res = await fetch(`${VITE_API_URL}/ai/generate-advice`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify({ 
+                    diagnosis: diagnosisText,
+                    medicines: prescriptions 
+                }),
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                // Append AI advice to existing advice with a newline
+                setAdvice(prev => prev ? prev + "\n\n" + data.advice : data.advice);
+            } else {
+                alert(data.message || "AI Generation Failed");
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Network Error: Could not reach AI service.");
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
     return (
         <fieldset className="p-4 border border-gray-200 rounded-xl mb-8 bg-white shadow-sm animate-fade-in">
             <legend className="text-lg font-bold text-indigo-700 px-2">Advice & Instructions</legend>
@@ -34,13 +81,37 @@ function ClinicalNotesPanel({
                 <button type="button" onClick={() => setIsInstructionModalOpen(true)} className="px-3 py-1 text-sm border border-pink-600 bg-pink-600 text-white rounded-full ml-auto hover:bg-pink-700 transition-colors shadow-sm">+ Manage Blocks</button>
             </div>
 
-            {/* 2. Main Advice Textarea */}
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Patient Advice / Upodesh</label>
+            {/* 2. Main Advice Textarea & AI Button */}
+            <div className="flex justify-between items-center mb-1">
+                <label className="block text-sm font-semibold text-gray-700">Patient Advice / Upodesh</label>
+                
+                {/* --- AI MAGIC BUTTON --- */}
+                <button 
+                    type="button" 
+                    onClick={handleGenerateAI}
+                    disabled={isGenerating}
+                    className={`flex items-center gap-1 px-3 py-1 text-xs font-bold text-white rounded-md shadow transition-all
+                        ${isGenerating ? 'bg-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700'}
+                    `}
+                >
+                    {isGenerating ? (
+                        <>
+                            <svg className="animate-spin h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            Generating...
+                        </>
+                    ) : (
+                        <>
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            Generate with AI
+                        </>
+                    )}
+                </button>
+                {/* ----------------------- */}
+            </div>
+
             <textarea className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-2 transition-shadow"
                 placeholder="General Advice (Rest, Follow up, etc.)" value={advice} onChange={(e) => setAdvice(e.target.value)} rows="6"
             ></textarea>
-
-            {/* REMOVED: Commented out Diagnosis Section */}
 
             {/* Instruction Modal */}
             <Modal isOpen={isInstructionModalOpen} onClose={() => { setIsInstructionModalOpen(false); setEditingInstructionBlock(null); setNewInstructionBlock({ title: '', content: '' }); }} 

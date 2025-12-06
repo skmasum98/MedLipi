@@ -19,6 +19,7 @@ import icdRoutes from './routes/icd.js';
 import patientPortalRoutes from './routes/patient_portal.js';
 import publicRoutes from './routes/public.js';
 import clinicalTemplateRoutes from './routes/clinical_templates.js';
+import aiRoutes from './routes/ai.js';
 
 // Initialize Express App
 const app = express();
@@ -48,6 +49,7 @@ app.use('/api/icd', icdRoutes);
 app.use('/api/portal', patientPortalRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/clinical-templates', clinicalTemplateRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Start Server
 app.listen(PORT, () => {

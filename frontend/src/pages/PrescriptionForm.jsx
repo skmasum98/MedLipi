@@ -515,6 +515,9 @@ function PrescriptionForm() {
                             handleSaveInstructionBlock={handleSaveInstructionBlock} handleDeleteInstructionBlock={handleDeleteInstructionBlock}
                             editingInstructionBlock={editingInstructionBlock} setEditingInstructionBlock={setEditingInstructionBlock}
                             newInstructionBlock={newInstructionBlock} setNewInstructionBlock={setNewInstructionBlock}
+                            // --- NEW PROPS FOR AI ---
+                            diagnosisList={diagnosesList}  // Pass diagnosis array
+                            prescriptions={prescriptions}  // Pass medicine array
                         />
 
                         <div className="mt-4 bg-white p-4 rounded border border-gray-300 shadow-sm">
