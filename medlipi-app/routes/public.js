@@ -189,9 +189,11 @@ router.get('/prescription/:uid', async (req, res) => {
         }
         
         if (pdfData.follow_up_date) {
-            doc.fontSize(11).font('Helvetica-Bold').fillColor('#2c3e50').text('Follow-up', rightColX, rightY);
-            rightY += 15;
-            doc.fontSize(7).font('Helvetica').fillColor('#333').text(pdfData.follow_up_date, rightColX, rightY);
+           const formattedDate = new Date(pdfData.follow_up_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+         
+         doc.fontSize(11).font('Bold').fillColor('#2c3e50').text('Follow-up', rightColX, rightY);
+         rightY += 15;
+         doc.fontSize(10).font('Helvetica').fillColor('#333').text(formattedDate, rightColX, rightY);
         }
 
         // Divider Line

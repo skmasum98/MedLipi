@@ -12,6 +12,27 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const fontPath = path.join(__dirname, '../fonts/NotoSerifBengali-Regular.ttf');
 
+const calculateFollowUpDate = (text) => {
+    if (!text) return null;
+    const today = new Date();
+    
+    // Regex to find number of days/weeks/months
+    // Matches: "7 days", "1 month", "2 weeks"
+    const match = text.toLowerCase().match(/(\d+)\s*(day|week|month)/);
+    
+    if (match) {
+        const num = parseInt(match[1]);
+        const unit = match[2];
+        
+        if (unit.includes('day')) today.setDate(today.getDate() + num);
+        if (unit.includes('week')) today.setDate(today.getDate() + (num * 7));
+        if (unit.includes('month')) today.setMonth(today.getMonth() + num);
+        
+        return today.toISOString().split('T')[0]; // Return YYYY-MM-DD
+    }
+    return null; // Could not parse
+};
+
 const router = express.Router();
 router.use(verifyToken);
 
@@ -95,7 +116,59 @@ router.post('/', async (req, res) => {
             ]);
         }
 
+        // 2.5 Auto-create Appointment if Follow-up is parsed
+        if (follow_up_date) {
+            const nextVisitDate = calculateFollowUpDate(follow_up_date);
+            
+            if (nextVisitDate) {
+                // Check if one already exists to avoid duplicates
+                const [exists] = await connection.query(
+                    `SELECT appointment_id FROM appointments WHERE patient_id = ? AND visit_date = ?`,
+                    [patientId, nextVisitDate]
+                );
+
+                if (exists.length === 0) {
+                    await connection.query(
+                        `INSERT INTO appointments (doctor_id, patient_id, visit_date, status, source, reason)
+                        VALUES (?, ?, ?, 'Pending_Followup', 'Auto-Followup', 'Prescribed Follow-up')`,
+                        [doctorId, patientId, nextVisitDate]
+                    );
+                }
+            }
+        }
+
         await connection.commit();
+
+            // --- AUTOMATIC APPOINTMENT CREATION ---
+        // If follow_up_date is provided (It will be YYYY-MM-DD from the frontend input)
+        if (follow_up_date) {
+            try {
+                // Check for valid date format roughly
+                const nextVisitDate = new Date(follow_up_date);
+                
+                if (!isNaN(nextVisitDate.getTime())) {
+                    const dateString = nextVisitDate.toISOString().split('T')[0];
+
+                    // Check duplicates
+                    const [exists] = await pool.query(
+                        `SELECT appointment_id FROM appointments WHERE patient_id = ? AND visit_date = ?`,
+                        [patientId, dateString]
+                    );
+
+                    if (exists.length === 0) {
+                        await pool.query(
+                            `INSERT INTO appointments (doctor_id, patient_id, visit_date, status, source, reason)
+                            VALUES (?, ?, ?, 'Pending_Followup', 'Auto-Followup', 'Prescribed Follow-up')`,
+                            [doctorId, patientId, dateString]
+                        );
+                        console.log("Auto-appointment created for:", dateString);
+                    }
+                }
+            } catch (err) {
+                console.error("Auto-appointment error:", err);
+                // Don't fail the whole request just for this
+            }
+        }
 
         // 3. Generate QR Code
         const publicLink = `${process.env.DOMAIN || 'http://localhost:5173'}/p/${publicUid}`; 
@@ -380,9 +453,11 @@ const generatePrescriptionPDF = (res, data) => {
     }
     
     if (data.follow_up_date) {
-        doc.fontSize(11).font('Bold').fillColor('#2c3e50').text('Follow-up', rightColX, rightY);
-        rightY += 15;
-        doc.fontSize(10).font('Bangla').fillColor('#333').text(data.follow_up_date, rightColX, rightY);
+        const formattedDate = new Date(data.follow_up_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+         
+         doc.fontSize(11).font('Bold').fillColor('#2c3e50').text('Follow-up', rightColX, rightY);
+         rightY += 15;
+         doc.fontSize(10).font('Helvetica').fillColor('#333').text(formattedDate, rightColX, rightY);
     }
 
     // Divider Line

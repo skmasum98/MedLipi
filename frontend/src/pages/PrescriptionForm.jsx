@@ -518,9 +518,13 @@ function PrescriptionForm() {
                             // --- NEW PROPS FOR AI ---
                             diagnosisList={diagnosesList}  // Pass diagnosis array
                             prescriptions={prescriptions}  // Pass medicine array
+
+                            followUp={followUp} 
+                            setFollowUp={setFollowUp} 
+
                         />
 
-                        <div className="mt-4 bg-white p-4 rounded border border-gray-300 shadow-sm">
+                        <div className="p-4 rounded border border-gray-300 shadow-sm">
                             <label className="block text-sm font-medium text-gray-700 mb-1">Follow-up Instructions</label>
                             <input 
                                 className="w-full p-2 border border-gray-300 rounded-md" 

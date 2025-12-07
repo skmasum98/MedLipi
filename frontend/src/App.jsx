@@ -17,6 +17,7 @@ import PatientRecord from './pages/PatientRecord';
 import PatientLogin from './pages/PatientLogin';
 import PatientDashboard from './pages/PatientDashboard';
 import PublicDownload from './pages/PublicDownload';
+import Appointments from './pages/Appointments';
 
 // --- Layout Component ---
 // Handles conditional rendering of the Header and main container styles
@@ -84,6 +85,7 @@ function Layout() {
                                         
                     {/* Catch-all Redirect */}
                     <Route path="*" element={<HomeRedirect />} />
+                    <Route path="/appointments" element={<ProtectedRoute><Appointments /></ProtectedRoute>} />
                 </Routes>
             </main>
         </>

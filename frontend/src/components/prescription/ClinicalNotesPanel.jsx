@@ -17,7 +17,10 @@ function ClinicalNotesPanel({
 
     // NEW PROPS for AI Context (passed from parent)
     diagnosisList, // List of diagnoses (array)
-    prescriptions  // List of meds (array)
+    prescriptions,  // List of meds (array)
+
+    // New Props for Follow Up Date
+    followUp, setFollowUp 
 }) {
     const { token } = useAuth();
     const [isGenerating, setIsGenerating] = useState(false);
@@ -58,6 +61,15 @@ function ClinicalNotesPanel({
         } finally {
             setIsGenerating(false);
         }
+    };
+
+    // --- Helper: Quick Date Calculator ---
+    const setQuickFollowUp = (days) => {
+        const date = new Date();
+        date.setDate(date.getDate() + days);
+        // Format to YYYY-MM-DD for the input[type="date"]
+        const dateString = date.toISOString().split('T')[0];
+        setFollowUp(dateString);
     };
 
     return (
@@ -112,6 +124,30 @@ function ClinicalNotesPanel({
             <textarea className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-2 transition-shadow"
                 placeholder="General Advice (Rest, Follow up, etc.)" value={advice} onChange={(e) => setAdvice(e.target.value)} rows="6"
             ></textarea>
+
+            <div className="mt-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <label className="block text-sm font-bold text-indigo-800 mb-2">Follow-up Visit</label>
+                
+                <div className="flex flex-col sm:flex-row gap-4 items-center">
+                    {/* Actual Date Input */}
+                    <div className="relative flex-1 w-full">
+                         <input 
+                            className="w-full p-2 border border-gray-300 rounded-md cursor-pointer focus:ring-indigo-500 focus:border-indigo-500" 
+                            type="date" 
+                            value={followUp} 
+                            onChange={(e) => setFollowUp(e.target.value)} 
+                        />
+                    </div>
+
+                    {/* Quick Buttons */}
+                    <div className="flex gap-2">
+                        <button type="button" onClick={() => setQuickFollowUp(3)} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-300 rounded shadow-sm hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition">+3 Days</button>
+                        <button type="button" onClick={() => setQuickFollowUp(7)} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-300 rounded shadow-sm hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition">+7 Days</button>
+                        <button type="button" onClick={() => setQuickFollowUp(15)} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-300 rounded shadow-sm hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition">+15 Days</button>
+                        <button type="button" onClick={() => setQuickFollowUp(30)} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-300 rounded shadow-sm hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition">+1 Month</button>
+                    </div>
+                </div>
+            </div>
 
             {/* Instruction Modal */}
             <Modal isOpen={isInstructionModalOpen} onClose={() => { setIsInstructionModalOpen(false); setEditingInstructionBlock(null); setNewInstructionBlock({ title: '', content: '' }); }} 
