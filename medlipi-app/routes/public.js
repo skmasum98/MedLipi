@@ -7,17 +7,17 @@ import { fileURLToPath } from 'url';
 
 const router = express.Router();
 
-// Fix for __dirname in ES Modules
+// --- FONTS CONFIGURATION ---
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const fontsDir = path.join(__dirname, '../fonts');
+const fontPath = path.join(__dirname, '../fonts/NotoSerifBengali-Regular.ttf'); // Ensure this file exists!
 
 // --- GET Public Prescription by UUID ---
 router.get('/prescription/:uid', async (req, res) => {
     const { uid } = req.params;
 
     try {
-        // 1. Find the prescription batch
+        // 1. Find the prescription batch by Public UID
         const query = `
             SELECT 
                 pr.*, d.generic_name, d.trade_names, d.strength, d.counseling_points as drug_counseling,
@@ -42,7 +42,7 @@ router.get('/prescription/:uid', async (req, res) => {
         const publicLink = `${process.env.DOMAIN || 'http://localhost:5173'}/p/${uid}`; 
         const qrCodeDataUrl = await QRCode.toDataURL(publicLink);
 
-        // 3. Prepare Data
+        // 3. Prepare Data Object for PDF
         const pdfData = {
             doctor: {
                 full_name: base.doc_name,
@@ -58,6 +58,7 @@ router.get('/prescription/:uid', async (req, res) => {
                 gender: base.gender,
                 id: base.db_patient_id
             },
+            date: base.created_at, // Pass the original date
             diagnosis_text: base.diagnosis_text,
             general_advice: base.general_advice,
             chief_complaint: base.chief_complaint,
@@ -77,35 +78,31 @@ router.get('/prescription/:uid', async (req, res) => {
                 duration: r.duration,
                 counseling_points: r.drug_counseling 
             })),
-            qrCodeDataUrl
+            qrCodeDataUrl 
         };
 
-        // 4. Generate PDF Stream
+        // 4. Generate PDF
         const doc = new PDFDocument({ size: 'A4', margin: 40 });
         
-        // Register Font
-        doc.registerFont('Bangla', path.join(fontsDir, 'bangla.ttf')); 
+        // --- REGISTER FONTS ---
+        doc.registerFont('Bangla', fontPath);       
+        doc.registerFont('Bold', 'Helvetica-Bold'); 
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `inline; filename="Prescription_${base.patient_name}.pdf"`); 
         doc.pipe(res);
 
-        // --- PDF LAYOUT (Using 'pdfData' variable) ---
+        // --- PDF LAYOUT ---
         
         // Header
         if (pdfData.doctor.clinic_name) {
-            doc.font('Bangla').fontSize(20).fillColor('#2c3e50').text(pdfData.doctor.clinic_name, 40, 40);
-            doc.fontSize(10).fillColor('#555').text(pdfData.doctor.chamber_address || '', 40, 65);
-            doc.text(`Phone: ${pdfData.doctor.phone_number || ''}`, 40, 80);
+            doc.fontSize(20).font('Bold').fillColor('#2c3e50').text(pdfData.doctor.clinic_name, 40, 40);
+            doc.fontSize(10).font('Helvetica').fillColor('#555').text(pdfData.doctor.chamber_address || '', 40, 65);
+            doc.font('Helvetica').text(`Phone: ${pdfData.doctor.phone_number || ''}`, 40, 80);
         }
-        
-        // Switch to Helvetica for standard English labels
-        doc.font('Helvetica-Bold');
-        
         const startX = 350;
-        doc.fontSize(14).fillColor('#000').text(`Dr. ${pdfData.doctor.full_name}`, startX, 40, { align: 'right' });
-        doc.fontSize(10).fillColor('#333').text(pdfData.doctor.degree || '', startX, 60, { align: 'right' });
-        doc.fontSize(9).fillColor('#666').text(pdfData.doctor.specialist_title || '', startX, 75, { align: 'right' });
+        doc.fontSize(14).font('Bold').fillColor('#000').text(`Dr. ${pdfData.doctor.full_name}`, startX, 40, { align: 'right' });
+        doc.fontSize(10).font('Helvetica').fillColor('#333').text(pdfData.doctor.degree || '', startX, 60, { align: 'right' });
         doc.text(`BMDC: ${pdfData.doctor.bmdc_reg}`, startX, 90, { align: 'right' });
 
         doc.moveDown(1.5);
@@ -114,9 +111,13 @@ router.get('/prescription/:uid', async (req, res) => {
         // Patient Info
         doc.y = 115;
         doc.fontSize(10).fillColor('#000');
-        doc.text(`Name: ${pdfData.patient.name}   [ID: ${pdfData.patient.id}]`, 40, 120); 
-        doc.text(`Age: ${pdfData.patient.age || '--'}    Sex: ${pdfData.patient.gender}`, 320, 120); 
-        doc.text(`Date: ${new Date().toLocaleDateString()}`, 450, 120, { align: 'right' });
+        
+        doc.font('Helvetica').text(`Name: ${pdfData.patient.name}   [ID: ${pdfData.patient.id}]`, 40, 120); 
+        doc.font('Helvetica').text(`Age: ${pdfData.patient.age || '--'}    Sex: ${pdfData.patient.gender}`, 320, 120);
+        
+        // Use Original Date
+        const dateStr = new Date(pdfData.date).toLocaleDateString();
+        doc.font('Helvetica').text(`Date: ${dateStr}`, 450, 120, { align: 'right' });
         
         doc.lineWidth(2).strokeColor('#2c3e50').moveTo(40, 140).lineTo(555, 140).stroke();
 
@@ -126,16 +127,12 @@ router.get('/prescription/:uid', async (req, res) => {
         const startY = 160;
         let leftY = startY; let rightY = startY;
 
-        // --- LEFT COLUMN ---
+        // LEFT COL
         const printLeftSection = (title, content) => {
             if (!content) return;
-            // Title in Helvetica
-            doc.font('Helvetica-Bold').fontSize(10).fillColor('#2c3e50')
-               .text(title, leftColX, leftY, { width: leftColWidth });
+            doc.fontSize(10).font('Helvetica-Bold').fillColor('#2c3e50').text(title, leftColX, leftY, { width: leftColWidth });
             leftY += 12;
-            // Content in Bangla (for user input text)
-            doc.font('Bangla').fontSize(9).fillColor('#333')
-               .text(content, leftColX, leftY, { width: leftColWidth });
+            doc.fontSize(9).font('Helvetica').fillColor('#333').text(content, leftColX, leftY, { width: leftColWidth });
             leftY = doc.y + 10;
         };
 
@@ -147,6 +144,8 @@ router.get('/prescription/:uid', async (req, res) => {
         if (ef.pulse) findingsText += `Pulse: ${ef.pulse} bpm\n`;
         if (ef.temp) findingsText += `Temp: ${ef.temp} F\n`;
         if (ef.weight) findingsText += `Wt: ${ef.weight} kg\n`;
+        if (ef.bmi) findingsText += `BMI: ${ef.bmi}\n`;
+        if (ef.spo2) findingsText += `SpO2: ${ef.spo2} %\n`;
         if (ef.other) findingsText += `\n${ef.other}`;
 
         printLeftSection('O/E', findingsText);
@@ -154,9 +153,9 @@ router.get('/prescription/:uid', async (req, res) => {
         printLeftSection('Investigations', pdfData.investigations);
         printLeftSection('Diagnosis', pdfData.diagnosis_text);
 
-        // --- RIGHT COLUMN ---
+        // RIGHT COL
         doc.y = rightY;
-        doc.font('Helvetica-Bold').fontSize(18).fillColor('#000').text('Rx', rightColX, rightY);
+        doc.fontSize(18).font('Helvetica-Bold').fillColor('#000').text('Rx', rightColX, rightY);
         rightY += 30;
 
         pdfData.prescriptions.forEach((item, index) => {
@@ -164,47 +163,35 @@ router.get('/prescription/:uid', async (req, res) => {
             const brand = item.trade_names || item.generic_name || 'Medicine'; 
             const strength = item.strength || '';
             
-            // Brand Line
-            doc.font('Helvetica-Bold').fontSize(11).fillColor('#000')
-               .text(`${index + 1}. ${brand} ${strength}`, rightColX, rightY);
+            doc.fontSize(11).font('Helvetica-Bold').fillColor('#000')
+            .text(`${index + 1}. ${brand} ${strength}`, rightColX, rightY);
             
-            // Generic Line
-            doc.font('Helvetica').fontSize(8).fillColor('#555')
-               .text(`(${item.generic_name})`, rightColX + 15, doc.y + 2);
+            doc.fontSize(8).font('Helvetica').fillColor('#555')
+            .text(`(${item.generic_name})`, rightColX + 15, doc.y + 2);
             
-            // Instruction (Bangla font for safety/flexibility)
-            doc.font('Bangla').fontSize(10).fillColor('#000')
-               .text(`${item.sig_instruction} -- ${item.duration}`, rightColX + 15, doc.y + 2);
+            doc.fontSize(10).font('Helvetica').fillColor('#000')
+            .text(`${item.sig_instruction} -- ${item.duration}`, rightColX + 15, doc.y + 2);
             
             if (item.counseling_points) {
-                doc.fontSize(8).font('Helvetica-Oblique').fillColor('#666')
-                   .text(`Note: ${item.counseling_points}`, rightColX + 15, doc.y + 2);
+                doc.fontSize(8).font('Helvetica').fillColor('#666')
+                .text(`Note: ${item.counseling_points}`, rightColX + 15, doc.y + 2);
             }
 
             rightY = doc.y + 12; 
         });
 
         rightY += 20;
-        
-        // Advice
         if (pdfData.general_advice) {
-            doc.font('Helvetica-Bold').fontSize(11).fillColor('#2c3e50').text('Advice', rightColX, rightY);
+            doc.fontSize(11).font('Helvetica-Bold').fillColor('#2c3e50').text('Advice', rightColX, rightY);
             rightY += 15;
-            
-            // FIX: Define cleanAdvice and use Bangla font
-            const cleanAdvice = pdfData.general_advice.replace(/\*\*/g, '').replace(/##/g, '');
-            
-            doc.font('Bangla').fontSize(10).fillColor('#333')
-               .text(cleanAdvice, rightColX, rightY, { width: rightColWidth });
-            
-            rightY = doc.y + 20;
+           doc.fontSize(7).font('Bangla').fillColor('#333').text(pdfData.general_advice, rightColX, rightY, { width: rightColWidth });
+        rightY = doc.y + 20;
         }
         
-        // Follow Up
         if (pdfData.follow_up_date) {
-            doc.font('Helvetica-Bold').fontSize(11).fillColor('#2c3e50').text('Follow-up', rightColX, rightY);
+            doc.fontSize(11).font('Helvetica-Bold').fillColor('#2c3e50').text('Follow-up', rightColX, rightY);
             rightY += 15;
-            doc.font('Bangla').fontSize(10).fillColor('#333').text(pdfData.follow_up_date, rightColX, rightY);
+            doc.fontSize(7).font('Helvetica').fillColor('#333').text(pdfData.follow_up_date, rightColX, rightY);
         }
 
         // Divider Line
@@ -215,15 +202,15 @@ router.get('/prescription/:uid', async (req, res) => {
         const bottomY = 730;
         if (pdfData.qrCodeDataUrl) {
             doc.image(pdfData.qrCodeDataUrl, 500, bottomY, { width: 50 });
-            doc.font('Helvetica').fontSize(8).fillColor('#555').text('Scan for e-copy', 430, bottomY + 50, { align: 'right' });
+            doc.fontSize(8).font('Helvetica').fillColor('#555').text('Scan for e-copy', 430, bottomY + 50, { align: 'right' });
         }
         
-        doc.font('Helvetica').text('Powered by MedLipi', 40, bottomY + 30, { align: 'left' });
+        doc.text('Powered by MedLipi', 40, bottomY + 30, { align: 'left' });
 
         doc.end();
 
     } catch (error) {
-        console.error("Public PDF Error:", error);
+        console.error(error);
         res.status(500).send('Error generating prescription');
     }
 });

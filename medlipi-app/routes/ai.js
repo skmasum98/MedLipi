@@ -27,11 +27,11 @@ router.post('/generate-advice', async (req, res) => {
             Generate a short, clear list of "General Advice" (Upodesh) for this patient.
             
             Rules:
-            1. Suggest diet restrictions or foods to eat.
-            2. Suggest lifestyle changes (rest, hygiene, etc).
-            3. Mention warning signs (when to visit hospital immediately).
-            4. Keep it concise (max 6-8 bullet points).
-            5. Language: English. Plain text only. no special formatting like ** or __ or #.
+            1. Suggest diet restrictions or foods to eat if needed.
+            2. Suggest lifestyle changes (rest, hygiene, etc) if needed.
+            3. Mention warning signs (when to visit hospital immediately) if needed.
+            4. Keep it concise (max 4-8 bullet points).
+            5. Language: Bangla or mixed English/Bangla. Plain text only. no special formatting like ** or __ or # serial should 1, 2, 3....
         `;
 
         // 3. Use the NEW Method signature
