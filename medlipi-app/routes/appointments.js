@@ -12,36 +12,37 @@ const verifyAnyUser = (req, res, next) => {
     const token = authHeader.split(' ')[1];
     jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
         if (err) return res.status(403).json({ message: 'Invalid token' });
-        req.user = decoded; // Attaches payload to req.user
+        req.user = decoded; 
         next();
     });
 };
 
-// Apply middleware to all routes in this file
 router.use(verifyAnyUser);
 
-// --- GET Appointments (For Doctor View) ---
+// --- GET Appointments (Doctor View) ---
 router.get('/', async (req, res) => {
-    const { date, type } = req.query; // type='upcoming' support
+    const { date, type } = req.query; // type='upcoming'
 
-    // Security Check: Only Doctors should see the full list
+    // Security: Only Doctors (or authorized staff)
     if (req.user.role !== 'doctor' && !req.user.bmdc) {
-         // (Optional) You could allow patients to see their own appts here if logic expanded
-         return res.status(403).json({ message: 'Access denied. Doctors only.' });
+         return res.status(403).json({ message: 'Access denied.' });
     }
 
-    // FIX: Use req.user.id instead of req.doctor.id
     const doctorId = req.user.id; 
 
     try {
+        // FIX: Changed 'const' to 'let' so we can append string conditions
         let query = `
             SELECT 
                 a.*, 
-                p.name as patient_name, p.mobile, p.age, p.gender
+                p.name as patient_name, p.mobile, p.age, p.gender,
+                ds.start_time as session_start -- <--- THIS LINE IS REQUIRED
             FROM appointments a
             JOIN patients p ON a.patient_id = p.patient_id
+            LEFT JOIN doctor_schedules ds ON a.schedule_id = ds.schedule_id -- <--- JOIN REQUIRED
             WHERE a.doctor_id = ?
         `;
+        
         const params = [doctorId];
 
         if (type === 'upcoming') {
@@ -50,7 +51,7 @@ router.get('/', async (req, res) => {
             query += ` AND a.visit_date = ? ORDER BY a.visit_time ASC`;
             params.push(date);
         } else {
-             // Fallback default
+             // Default: Today
              query += ` AND a.visit_date = CURDATE() ORDER BY a.visit_time ASC`;
         }
 
@@ -62,20 +63,17 @@ router.get('/', async (req, res) => {
     }
 });
 
-// --- POST Create Appointment (Patient OR Doctor) ---
+// --- POST Create Appointment ---
 router.post('/', async (req, res) => {
     const { patient_id, visit_date, visit_time, reason, source } = req.body;
     
     let doctorId, finalPatientId, finalSource;
 
-    // FIX: Use req.user to check role
     if (req.user.role === 'patient') {
-        // Patient booking
         doctorId = req.body.doctor_id || 1; 
-        finalPatientId = req.user.id; // Use ID from token for safety
+        finalPatientId = req.user.id; 
         finalSource = 'Online';
     } else {
-        // Doctor booking
         doctorId = req.user.id;
         finalPatientId = patient_id;
         finalSource = source || 'Reception';
@@ -94,24 +92,7 @@ router.post('/', async (req, res) => {
     }
 });
 
-// --- PUT Update Status ---
-router.put('/:id/status', async (req, res) => {
-    const { status } = req.body;
-    const { id } = req.params;
-    
-    // Only Doctors should update status
-    if (req.user.role === 'patient') return res.status(403).json({message: "Unauthorized"});
-
-    try {
-        await pool.query('UPDATE appointments SET status = ? WHERE appointment_id = ?', [status, id]);
-        res.json({ message: 'Status updated' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Update failed' });
-    }
-});
-
-// --- PUT Update Appointment Details (Time, Date, Reason) ---
+// --- PUT Update Details ---
 router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { visit_date, visit_time, reason, status } = req.body;
@@ -124,6 +105,22 @@ router.put('/:id', async (req, res) => {
             [visit_date, visit_time, reason, status, id]
         );
         res.json({ message: 'Appointment updated successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Update failed' });
+    }
+});
+
+// --- PUT Update Status ---
+router.put('/:id/status', async (req, res) => {
+    const { status } = req.body;
+    const { id } = req.params;
+    
+    if (req.user.role === 'patient') return res.status(403).json({message: "Unauthorized"});
+
+    try {
+        await pool.query('UPDATE appointments SET status = ? WHERE appointment_id = ?', [status, id]);
+        res.json({ message: 'Status updated' });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Update failed' });

@@ -86,4 +86,27 @@ router.get('/my-history', verifyPatientToken, async (req, res) => {
     }
 });
 
+
+// --- 3. GET MY ACTIVE APPOINTMENTS ---
+router.get('/my-appointments', verifyPatientToken, async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                a.appointment_id, a.visit_date, a.visit_time, a.status, a.serial_number,
+                d.clinic_name
+            FROM appointments a
+            JOIN doctors d ON a.doctor_id = d.doctor_id
+            WHERE a.patient_id = ? 
+            AND a.visit_date >= CURDATE() -- Only future or today
+            AND a.status != 'Cancelled'
+            ORDER BY a.visit_date ASC
+        `;
+        const [rows] = await pool.query(query, [req.patientId]);
+        res.json(rows);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 export default router;
