@@ -4,6 +4,55 @@ import jwt from 'jsonwebtoken';
 
 const router = express.Router();
 
+// --- 0. PATIENT REGISTRATION ---
+router.post('/register', async (req, res) => {
+    const { name, mobile, age, gender, address } = req.body;
+
+    // 1. Basic Validation
+    if (!name || !mobile || !gender) {
+        return res.status(400).json({ message: 'Name, Mobile, and Gender are required.' });
+    }
+
+    try {
+        // 2. Check if Mobile already exists (Prevent duplicates)
+        // In a real app, you might use OTP to verify, but for now, we enforce unique mobile numbers.
+        const [existing] = await pool.query('SELECT patient_id FROM patients WHERE mobile = ?', [mobile]);
+        
+        if (existing.length > 0) {
+            return res.status(409).json({ message: 'This mobile number is already registered. Please login.' });
+        }
+
+        // 3. Insert New Patient
+        // We use "0" as doctor_id or handle it logically. In your schema, patients table doesn't enforce doctor_id, 
+        // prescriptions map patients to doctors. So a patient can exist independently.
+        const query = `
+            INSERT INTO patients (name, mobile, age, gender, address, created_at) 
+            VALUES (?, ?, ?, ?, ?, NOW())
+        `;
+        
+        const [result] = await pool.query(query, [name, mobile, age, gender, address]);
+        const newPatientId = result.insertId;
+
+        // 4. Generate Token (Auto-Login)
+        const token = jwt.sign(
+            { id: newPatientId, role: 'patient', name: name },
+            process.env.JWT_SECRET,
+            { expiresIn: '30d' } 
+        );
+
+        res.status(201).json({ 
+            message: 'Registration Successful', 
+            token,
+            patient: { id: newPatientId, name, mobile }
+        });
+
+    } catch (error) {
+        console.error("Registration Error:", error);
+        res.status(500).json({ message: 'Server error during registration' });
+    }
+});
+
+
 // --- 1. PATIENT LOGIN (ID + Mobile) ---
 router.post('/login', async (req, res) => {
     const { patient_id, mobile } = req.body;

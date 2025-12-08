@@ -19,6 +19,7 @@ import PatientDashboard from './pages/PatientDashboard';
 import PublicDownload from './pages/PublicDownload';
 import Appointments from './pages/Appointments';
 import SessionManager from './pages/SessionManager';
+import PatientRegister from './pages/PatientRegister';
 
 // --- Layout Component ---
 // Handles conditional rendering of the Header and main container styles
@@ -88,6 +89,7 @@ function Layout() {
                     <Route path="*" element={<HomeRedirect />} />
                     <Route path="/appointments" element={<ProtectedRoute><Appointments /></ProtectedRoute>} />
                     <Route path="/session" element={<ProtectedRoute><SessionManager /></ProtectedRoute>} />
+                    <Route path="/patient/register" element={<PatientRegister />} />
                 </Routes>
             </main>
         </>

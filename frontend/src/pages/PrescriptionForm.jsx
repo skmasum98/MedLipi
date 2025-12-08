@@ -80,9 +80,10 @@ function PrescriptionForm() {
 
     // --- 2. EDIT MODE INITIALIZATION ---
     useEffect(() => {
-        if (location.state && location.state.editMode) {
-            const { visitData, patientData } = location.state;
-            
+        if (location.state) {
+            // CASE A: EDIT MODE (Old Prescription)
+            if (location.state.editMode) {
+                const { visitData, patientData } = location.state;
             // A. Populate Patient
             setPatient({
                 name: patientData.name,
@@ -150,6 +151,33 @@ function PrescriptionForm() {
 
             // F. Set Metadata
             setOriginalDate(visitData.raw_date);
+            
+        }
+        // CASE B: QUEUE MODE (New Prescription from Dashboard)
+            else if (location.state.patientData) {
+                const p = location.state.patientData;
+                
+                // Pre-fill only Patient Details
+                setPatient({
+                    name: p.patient_name || p.name, // Handle different field names from API
+                    gender: p.gender,
+                    id: p.patient_id,
+                    dob: p.dob || '',
+                    // Logic to calculate age or keep existing string
+                    age: p.age, 
+                    ageYears: '', ageMonths: '', ageDays: '',
+                    mobile: p.mobile || '',
+                    email: p.email || '',
+                    address: p.address || '',
+                    referred_by: p.referred_by || ''
+                });
+
+                // Clear everything else to ensure it's a fresh start
+                setPrescriptions([]);
+                setDiagnosesList([]);
+                setAdvice('');
+                setOriginalDate(null); // Ensure this is NULL so it saves as New
+            }
         }
     }, [location.state]);
 

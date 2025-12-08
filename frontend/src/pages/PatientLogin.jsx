@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 
 const VITE_API_URL = import.meta.env.VITE_API_URL;
 
@@ -68,6 +68,9 @@ function PatientLogin() {
                         Login to View Records
                     </button>
                 </form>
+                <div className="mt-6 text-center text-sm text-gray-600">
+                    New Patient? <Link to="/patient/register" className="text-green-700 font-bold hover:underline">Register here</Link>
+                </div>
                 
                 <div className="mt-6 text-center text-xs text-gray-400">
                     <p>Powered by MedLipi</p>
