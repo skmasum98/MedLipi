@@ -8,6 +8,7 @@ const router = express.Router();
 // (Reuse the 'verifyAnyUser' logic from appointments.js or import it)
 // For brevity, I'm redefining a simple one here or assume you import it.
 import jwt from 'jsonwebtoken';
+
 const verifyAnyUser = (req, res, next) => {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ message: 'No token' });
@@ -19,6 +20,56 @@ const verifyAnyUser = (req, res, next) => {
 };
 
 router.use(verifyAnyUser);
+
+// --- DOCTOR: GET MY OWN SESSIONS (All: Past & Future) ---
+router.get('/my-sessions', async (req, res) => {
+    // 1. Security Check
+    if (req.user.role !== 'doctor' && !req.user.bmdc) {
+        return res.status(403).json({ message: "Access denied" });
+    }
+
+    try {
+        const query = `
+            SELECT 
+                s.*, 
+                COUNT(a.appointment_id) as booked_count
+            FROM doctor_schedules s
+            LEFT JOIN appointments a ON s.schedule_id = a.schedule_id AND a.status != 'Cancelled'
+            WHERE s.doctor_id = ? 
+            GROUP BY s.schedule_id
+            ORDER BY s.date DESC, s.start_time ASC
+        `;
+        // Use req.user.id (from token)
+        const [rows] = await pool.query(query, [req.user.id]);
+        res.json(rows);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ message: 'Error fetching my sessions' });
+    }
+});
+
+// --- DOCTOR: DELETE SESSION ---
+router.delete('/:id', async (req, res) => {
+    if (req.user.role !== 'doctor') return res.status(403).json({ message: "Unauthorized" });
+    
+    const scheduleId = req.params.id;
+
+    try {
+        // Optional: Check if appointments exist first to prevent deleting active data
+        // For now, we assume deleting schedule might nullify appointments or we cascade delete
+        // A safer approach is to update status to 'Closed' instead of delete.
+        // Let's doing HARD DELETE for now, but in prod use Soft Delete.
+        
+        await pool.query('DELETE FROM doctor_schedules WHERE schedule_id = ? AND doctor_id = ?', [scheduleId, req.user.id]);
+        res.json({ message: 'Session deleted' });
+    } catch (e) {
+        // Handle FK constraint error (if appointments exist)
+        if (e.code === 'ER_ROW_IS_REFERENCED_2') {
+            return res.status(400).json({ message: 'Cannot delete: This session has booked appointments. Cancel them first.' });
+        }
+        res.status(500).json({ message: 'Delete failed' });
+    }
+});
 
 // --- DOCTOR: CREATE SESSION ---
 router.post('/create', async (req, res) => {

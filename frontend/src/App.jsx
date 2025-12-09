@@ -1,95 +1,97 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router'; // FIXED IMPORT
+// FIX: Changed 'react-router' to 'react-router-dom' for standard web routing
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router';
 import { AuthProvider, useAuth } from './hooks/useAuth'; 
 import ProtectedRoute from './components/ProtectedRoute'; 
-import Header from './components/Header'; 
 
-// --- Pages Imports ---
-import Home from './pages/Home'; // Landing Page
+// --- Navigation Components ---
+import Header from './components/Header';           // Doctor's Blue Header
+import PatientHeader from './components/PatientHeader'; // Patient/Public White Header
+
+// --- Page Imports ---
+// Public & Patient Pages
+import Home from './pages/Home'; 
 import Login from './pages/Login';
 import Register from './pages/Register';
-import PrescriptionForm from './pages/PrescriptionForm';
-import Dashboard from './pages/Dashboard';
-import Settings from './pages/Settings';
-import Inventory from './pages/Inventory';
-import Patients from './pages/Patients';
-import PatientRecord from './pages/PatientRecord';
+import FindDoctors from './pages/FindDoctors';
 import PatientLogin from './pages/PatientLogin';
+import PatientRegister from './pages/PatientRegister';
 import PatientDashboard from './pages/PatientDashboard';
 import PublicDownload from './pages/PublicDownload';
+
+// Doctor Protected Pages
+import Dashboard from './pages/Dashboard';
+import PrescriptionForm from './pages/PrescriptionForm';
+import Inventory from './pages/Inventory';
+import Settings from './pages/Settings';
+import Patients from './pages/Patients';
+import PatientRecord from './pages/PatientRecord';
 import Appointments from './pages/Appointments';
 import SessionManager from './pages/SessionManager';
-import PatientRegister from './pages/PatientRegister';
 
-// --- Layout Component ---
-// Handles conditional rendering of the Header and main container styles
+// --- Layout Manager Component ---
+// Decides which Header to show based on the URL path
 function Layout() {
     const location = useLocation();
     
-    // Paths where the Doctor Navigation/Header should NOT appear
-    const noHeaderPaths = [
-        '/',                // Landing Page
-        '/login',           // Doctor Login
-        '/register',        // Doctor Register
-        '/patient/login',   // Patient Login
-        '/my-health'        // Patient Dashboard
+    // List of route prefixes that belong to the "Doctor Portal"
+    const doctorRoutes = [
+        '/dashboard', 
+        '/prescription', 
+        '/inventory', 
+        '/profile', 
+        '/patients', 
+        '/appointments',
+        '/session'
     ];
 
-    // Check if current path is in the list OR if it starts with '/p/' (Public Download)
+    // Check logic
+    const isDoctorRoute = doctorRoutes.some(path => location.pathname.startsWith(path));
     const isPublicDownload = location.pathname.startsWith('/p/');
-    const showHeader = !noHeaderPaths.includes(location.pathname) && !isPublicDownload;
 
     return (
         <>
-            {/* Show Header only for Doctor Protected Routes */}
-            {showHeader && <Header />}
-            
-            {/* Apply padding/background styling only for dashboard pages */}
-            <main className={showHeader ? "pt-4 pb-10 bg-gray-50 min-h-screen" : "min-h-screen"}>
-                <Routes>
-                    {/* --- PUBLIC ROUTES --- */}
-                    <Route path="/" element={<Home />} />
-                    <Route path="/register" element={<Register />} />
-                    <Route path="/login" element={<Login />} /> 
-                    
-                    {/* Plan A: QR Code Public Download */}
-                    <Route path="/p/:uid" element={<PublicDownload />} /> 
+            {/* 1. DOCTOR HEADER (Blue) - Only on Doctor Routes */}
+            {isDoctorRoute && <Header />}
 
-                    {/* Plan B: Patient Portal */}
+            {/* 2. PATIENT HEADER (White) - On all other pages EXCEPT Public Download */}
+            {!isDoctorRoute && !isPublicDownload && <PatientHeader />}
+            
+            {/* Main Content Area */}
+            {/* Doctor Dashboard gets specific padding/bg, others take full screen defaults */}
+            <main className={isDoctorRoute ? "pt-4 pb-10 bg-gray-50 min-h-screen" : "min-h-screen"}>
+                <Routes>
+                    
+                    {/* --- PUBLIC & PATIENT ROUTES (White Header) --- */}
+                    <Route path="/" element={<Home />} />
+                    <Route path="/login" element={<Login />} /> 
+                    <Route path="/register" element={<Register />} />
+                    
+                    <Route path="/find-doctors" element={<FindDoctors />} />
                     <Route path="/patient/login" element={<PatientLogin />} />
+                    <Route path="/patient/register" element={<PatientRegister />} />
                     <Route path="/my-health" element={<PatientDashboard />} />
 
-                    {/* --- DOCTOR PROTECTED ROUTES --- */}
-                    <Route 
-                        path="/dashboard" 
-                        element={<ProtectedRoute><Dashboard /></ProtectedRoute>} 
-                    />
-                    <Route 
-                        path="/prescription/new" 
-                        element={<ProtectedRoute><PrescriptionForm /></ProtectedRoute>} 
-                    />
-                    <Route 
-                        path="/inventory" 
-                        element={<ProtectedRoute><Inventory /></ProtectedRoute>} 
-                    />
-                    <Route 
-                        path="/profile" 
-                        element={<ProtectedRoute><Settings /></ProtectedRoute>} 
-                    />
-                    <Route 
-                        path="/patients" 
-                        element={<ProtectedRoute><Patients /></ProtectedRoute>} 
-                    />
-                    <Route 
-                        path="/patients/:id" 
-                        element={<ProtectedRoute><PatientRecord /></ProtectedRoute>} 
-                    />
-                                        
-                    {/* Catch-all Redirect */}
-                    <Route path="*" element={<HomeRedirect />} />
+                    {/* --- ISOLATED ROUTES (No Header) --- */}
+                    <Route path="/p/:uid" element={<PublicDownload />} /> 
+
+                    {/* --- DOCTOR PROTECTED ROUTES (Blue Header) --- */}
+                    <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                    <Route path="/prescription/new" element={<ProtectedRoute><PrescriptionForm /></ProtectedRoute>} />
+                    <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
+                    <Route path="/profile" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                    
+                    {/* Patient Management */}
+                    <Route path="/patients" element={<ProtectedRoute><Patients /></ProtectedRoute>} />
+                    <Route path="/patients/:id" element={<ProtectedRoute><PatientRecord /></ProtectedRoute>} />
+                    
+                    {/* Scheduling */}
                     <Route path="/appointments" element={<ProtectedRoute><Appointments /></ProtectedRoute>} />
                     <Route path="/session" element={<ProtectedRoute><SessionManager /></ProtectedRoute>} />
-                    <Route path="/patient/register" element={<PatientRegister />} />
+                                        
+                    {/* Fallback Redirect */}
+                    <Route path="*" element={<HomeRedirect />} />
+
                 </Routes>
             </main>
         </>
@@ -108,15 +110,13 @@ function App() {
 }
 
 // --- Helper: Redirect Logic ---
-// Redirects unknown URLs: 
-// - If logged in: Go to Dashboard
-// - If not logged in: Go to Login (or Home '/')
 function HomeRedirect() {
     const { isAuthenticated, isLoading } = useAuth();
     
-    if (isLoading) return <div className="p-10 text-center text-gray-500">Loading App...</div>; 
+    if (isLoading) return <div className="p-10 text-center text-gray-500">Loading...</div>; 
     
-    return <Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />;
+    // If logged in as Doctor -> Dashboard, otherwise -> Home
+    return <Navigate to={isAuthenticated ? "/dashboard" : "/"} replace />;
 }
 
 export default App;

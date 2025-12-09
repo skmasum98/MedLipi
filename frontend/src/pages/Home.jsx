@@ -5,34 +5,7 @@ function Home() {
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
             
-            {/* --- NAVBAR --- */}
-            <nav className="bg-white border-b border-gray-200">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between h-16 items-center">
-                        {/* Logo */}
-                        <div className="flex-shrink-0 flex items-center gap-2">
-                            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">M</div>
-                            <span className="font-extrabold text-xl text-gray-900 tracking-tight">MedLipi</span>
-                        </div>
-
-                        {/* Right Actions */}
-                        <div className="flex items-center gap-4">
-                            <Link to="/patient/login" className="text-gray-600 hover:text-indigo-600 font-medium text-sm hidden md:block">
-                                Patient Portal
-                            </Link>
-                            <div className="h-6 w-px bg-gray-300 hidden md:block"></div>
-                            <Link to="/login" className="text-gray-900 hover:text-indigo-600 font-medium text-sm">
-                                Doctor Login
-                            </Link>
-                            <Link to="/register" className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-all">
-                                Get Started
-                            </Link>
-                        </div>
-                    </div>
-                </div>
-            </nav>
-
-            {/* --- HERO SECTION --- */}
+             {/* --- HERO SECTION --- */}
             <header className="flex-1 flex items-center justify-center pt-16 pb-24 px-4 sm:px-6 lg:px-8 bg-white">
                 <div className="text-center max-w-4xl mx-auto">
                     <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 tracking-tight mb-6">
@@ -42,6 +15,7 @@ function Home() {
                     <p className="text-xl text-gray-500 mb-10 max-w-2xl mx-auto">
                         MedLipi helps doctors generate professional prescriptions in seconds, track patient history, and manage drug interactions securely.
                     </p>
+                    <Link to="/find-doctors" className="text-indigo-600 font-semibold hover:underline">Find a Doctor</Link>
 
                     {/* Dual Call to Action */}
                     <div className="flex flex-col sm:flex-row justify-center gap-4">

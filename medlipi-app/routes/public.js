@@ -12,6 +12,45 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const fontPath = path.join(__dirname, '../fonts/NotoSerifBengali-Regular.ttf'); // Ensure this file exists!
 
+
+// --- GET All Doctors ---
+router.get('/doctors', async (req, res) => {
+    try {
+        const query = `SELECT doctor_id, full_name, degree, specialist_title, clinic_name, chamber_address FROM doctors`;
+        const [doctors] = await pool.query(query);
+        res.json(doctors);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error fetching doctors' });
+    }
+});
+
+// --- GET Specific Doctor's Available Schedules ---
+router.get('/doctors/:id/schedules', async (req, res) => {
+    const doctorId = req.params.id;
+    // Get "Today" in YYYY-MM-DD format from the Server's local time perspective
+    const today = new Date().toISOString().split('T')[0];
+
+    try {
+        const query = `
+            SELECT 
+                s.*, 
+                COUNT(a.appointment_id) as booked_count
+            FROM doctor_schedules s
+            LEFT JOIN appointments a ON s.schedule_id = a.schedule_id AND a.status != 'Cancelled'
+            WHERE s.doctor_id = ? 
+            AND s.date >= ? 
+            GROUP BY s.schedule_id
+            ORDER BY s.date ASC, s.start_time ASC
+        `;
+        const [rows] = await pool.query(query, [doctorId, today]);
+        res.json(rows);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ message: 'Error fetching schedules' });
+    }
+});
+
 // --- GET Public Prescription by UUID ---
 router.get('/prescription/:uid', async (req, res) => {
     const { uid } = req.params;

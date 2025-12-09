@@ -142,7 +142,8 @@ router.get('/my-appointments', verifyPatientToken, async (req, res) => {
         const query = `
             SELECT 
                 a.appointment_id, a.visit_date, a.visit_time, a.status, a.serial_number,
-                d.clinic_name
+                d.clinic_name,
+                d.full_name as doctor_name
             FROM appointments a
             JOIN doctors d ON a.doctor_id = d.doctor_id
             WHERE a.patient_id = ? 

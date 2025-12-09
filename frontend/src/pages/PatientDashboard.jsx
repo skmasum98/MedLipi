@@ -5,18 +5,13 @@ const VITE_API_URL = import.meta.env.VITE_API_URL;
 
 function PatientDashboard() {
     const [history, setHistory] = useState([]);
-    const [myAppointments, setMyAppointments] = useState([]); // NEW: To track booking status
+    const [myAppointments, setMyAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
+    
     const navigate = useNavigate();
     const token = localStorage.getItem('patientToken');
     const patientName = localStorage.getItem('patientName');
-    
-    // Booking States
-    const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
-    const [sessions, setSessions] = useState([]);
-    const [bookingLoading, setBookingLoading] = useState(false);
 
-    // --- 1. Load History & Appointments ---
     useEffect(() => {
         if (!token) {
             navigate('/patient/login');
@@ -25,7 +20,7 @@ function PatientDashboard() {
 
         const fetchData = async () => {
             try {
-                // Fetch Past Prescriptions (History)
+                // 1. Fetch History
                 const histRes = await fetch(`${VITE_API_URL}/portal/my-history`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
@@ -35,11 +30,7 @@ function PatientDashboard() {
                     navigate('/patient/login');
                 }
 
-                // Fetch My Upcoming Appointments (Status Check)
-                // (Note: We might need a new endpoint for this, or reuse one. 
-                // Let's assume we can fetch via the portal route or general appointments route)
-                // For MVP: Let's assume we create a quick helper or reuse an existing route logic
-                // Update backend (Step 2 below) to support this cleanly
+                // 2. Fetch Upcoming Status
                  const apptRes = await fetch(`${VITE_API_URL}/portal/my-appointments`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
@@ -51,63 +42,22 @@ function PatientDashboard() {
         fetchData();
     }, [token, navigate]);
 
-    // --- 2. Load Available Slots for Booking Modal ---
-    const openBookingModal = async () => {
-        setBookingLoading(true);
-        setIsBookingModalOpen(true);
-        try {
-            const res = await fetch(`${VITE_API_URL}/schedules/available`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (res.ok) setSessions(await res.json());
-        } catch (e) { console.error(e); } 
-        finally { setBookingLoading(false); }
-    };
-
-    // --- 3. Handle Serial Booking ---
-    const handleBookSerial = async (scheduleId) => {
-        if(!window.confirm("Confirm booking for this session?")) return;
-        
-        try {
-            const res = await fetch(`${VITE_API_URL}/schedules/book-serial`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ schedule_id: scheduleId })
-            });
-            const data = await res.json();
-            if (res.ok) {
-                alert(`Booking Successful! Your Serial is #${data.serial}. Waiting for confirmation.`);
-                setIsBookingModalOpen(false);
-                // Refresh list to show new pending appointment
-                window.location.reload(); 
-            } else {
-                alert(data.message);
-            }
-        } catch (e) { alert('Error booking'); }
-    };
-
+    // --- HANDLERS ---
     const handleDownload = (uid) => window.open(`${VITE_API_URL}/public/prescription/${uid}`, '_blank');
-    const handleLogout = () => { localStorage.removeItem('patientToken'); navigate('/patient/login'); };
+    
+    const handleLogout = () => { 
+        localStorage.removeItem('patientToken'); 
+        navigate('/patient/login'); 
+    };
+
+    // Simply redirect to the dedicated booking page
+    const handleBookVisit = () => {
+        navigate('/find-doctors');
+    };
 
     return (
         <div className="min-h-screen bg-gray-50 pb-10">
-            {/* Navbar */}
-            <nav className="bg-green-600 text-white shadow-lg sticky top-0 z-10">
-                <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-white text-green-600 rounded-full flex items-center justify-center font-bold">P</div>
-                        <h1 className="text-xl font-bold">My Health</h1>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <span className="text-sm hidden sm:block opacity-90">Hi, {patientName}</span>
-                        <button onClick={openBookingModal} className="bg-white text-green-700 font-bold px-3 py-1.5 rounded shadow hover:bg-green-50 transition text-sm">
-                            + Book Visit
-                        </button>
-                        <button onClick={handleLogout} className="bg-green-700 hover:bg-green-800 border border-green-500 px-3 py-1.5 rounded text-sm transition">Logout</button>
-                    </div>
-                </div>
-            </nav>
-
+           
             <div className="max-w-4xl mx-auto p-4 space-y-8 mt-4">
 
                 {/* --- SECTION 1: MY UPCOMING APPOINTMENTS --- */}
@@ -120,19 +70,30 @@ function PatientDashboard() {
                         </div>
                         <div className="divide-y divide-gray-100">
                             {myAppointments.map(appt => (
-                                <div key={appt.appointment_id} className="p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-                                    <div>
+                                <div key={appt.appointment_id} className="p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4 hover:bg-orange-50/30 transition">
+                                    <div className="flex flex-col gap-1">
                                         <div className="flex items-center gap-2">
                                             <span className="font-bold text-gray-800 text-lg">
                                                 {new Date(appt.visit_date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
                                             </span>
-                                            {appt.visit_time && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs font-mono">{appt.visit_time.substring(0,5)}</span>}
+                                            {appt.visit_time ? (
+                                                <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs font-mono">{appt.visit_time.substring(0,5)}</span>
+                                            ) : (
+                                                <span className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded text-xs font-bold">Time TBD</span>
+                                            )}
                                         </div>
-                                        <p className="text-sm text-gray-500">Serial: <span className="font-bold text-gray-800">#{appt.serial_number}</span></p>
+                                        
+                                        <div className="text-sm text-indigo-700 font-semibold">
+                                            Dr. {appt.doctor_name || 'Doctor'}
+                                        </div>
+                                        <div className="text-xs text-gray-500">
+                                            {appt.clinic_name} • Serial <span className="font-bold text-gray-800">#{appt.serial_number}</span>
+                                        </div>
                                     </div>
+
                                     <div>
                                         <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide 
-                                            ${appt.status === 'Confirmed' || appt.status === 'Scheduled' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                            ${appt.status === 'Confirmed' || appt.status === 'Completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                                             {appt.status.replace('_', ' ')}
                                         </span>
                                     </div>
@@ -172,54 +133,6 @@ function PatientDashboard() {
                     )}
                 </div>
             </div>
-
-            {/* --- BOOKING MODAL (List of Sessions) --- */}
-            {isBookingModalOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50 animate-fade-in backdrop-blur-sm">
-                    <div className="bg-white rounded-xl p-6 w-full max-w-2xl shadow-2xl max-h-[80vh] flex flex-col">
-                        <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-100">
-                            <h3 className="text-xl font-bold text-gray-900">Available Schedules</h3>
-                            <button onClick={() => setIsBookingModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
-                        </div>
-                        
-                        <div className="overflow-y-auto flex-1 pr-2">
-                            {bookingLoading ? (
-                                <p className="text-center text-gray-500 py-10">Checking availability...</p>
-                            ) : sessions.length === 0 ? (
-                                <p className="text-center text-gray-500 py-10">No sessions available right now.</p>
-                            ) : (
-                                <div className="grid gap-3">
-                                    {sessions.map(s => {
-                                        const isFull = s.booked_count >= s.max_patients;
-                                        return (
-                                            <div key={s.schedule_id} className={`p-4 rounded-lg border flex justify-between items-center transition-all ${isFull ? 'bg-gray-50 border-gray-200 opacity-70' : 'bg-white border-green-200 hover:border-green-400 hover:shadow-md'}`}>
-                                                <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-bold text-gray-800 text-lg">
-                                                            {new Date(s.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric'})}
-                                                        </span>
-                                                        <span className="text-xs font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-700 uppercase">{s.session_name}</span>
-                                                    </div>
-                                                    <p className="text-sm text-gray-500 mt-1">Time: {s.start_time.substring(0,5)} - {s.end_time.substring(0,5)}</p>
-                                                    <p className="text-xs font-medium text-gray-400 mt-1">Slots: {s.booked_count} / {s.max_patients} booked</p>
-                                                </div>
-                                                
-                                                <button 
-                                                    disabled={isFull}
-                                                    onClick={() => handleBookSerial(s.schedule_id)}
-                                                    className={`px-5 py-2 rounded-lg font-bold text-sm shadow-sm ${isFull ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700 hover:-translate-y-0.5 transition-transform'}`}
-                                                >
-                                                    {isFull ? 'Full' : 'Book Serial'}
-                                                </button>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
