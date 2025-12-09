@@ -166,7 +166,7 @@ router.post('/book-serial', async (req, res) => {
         await connection.query(
             `INSERT INTO appointments 
             (doctor_id, patient_id, schedule_id, visit_date, serial_number, source, status, reason)
-            VALUES (?, ?, ?, ?, ?, ?, 'Pending_Confirmation', 'Portal Request')`,
+            VALUES (?, ?, ?, ?, ?, ?, 'Confirmed', 'Portal Request')`,
             [session.doctor_id, actualPatientId, schedule_id, session.date, nextSerial, 'Online']
         );
 
