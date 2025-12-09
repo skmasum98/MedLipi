@@ -48,8 +48,10 @@ function PrescriptionForm() {
     const [advice, setAdvice] = useState('');
     const [followUp, setFollowUp] = useState('');
 
-    // --- EDIT MODE STATE ---
+    // --- EDIT / QUEUE MODE STATES ---
     const [originalDate, setOriginalDate] = useState(null);
+    const [linkedAppointmentId, setLinkedAppointmentId] = useState(null); 
+    const [isReturningPatient, setIsReturningPatient] = useState(false);
 
     // --- TEMPLATES & MODAL STATES ---
     const [sigTemplates, setSigTemplates] = useState([]);
@@ -78,92 +80,84 @@ function PrescriptionForm() {
         fetchData();
     }, [authToken, VITE_API_URL]);
 
-    // --- 2. EDIT MODE INITIALIZATION ---
+    // --- 2. INITIALIZATION (Edit Mode OR Queue Mode) ---
     useEffect(() => {
         if (location.state) {
+            
             // CASE A: EDIT MODE (Old Prescription)
             if (location.state.editMode) {
                 const { visitData, patientData } = location.state;
-            // A. Populate Patient
-            setPatient({
-                name: patientData.name,
-                gender: patientData.gender,
-                id: patientData.patient_id,
-                age: patientData.age,
-                dob: patientData.dob || '',
-                ageYears: '', ageMonths: '', ageDays: '',
-                mobile: patientData.mobile || '',
-                email: patientData.email || '',
-                address: patientData.address || '',
-                referred_by: patientData.referred_by || ''
-            });
-
-            // B. Populate Assessment
-            setChiefComplaint(visitData.chief_complaint || '');
-            setHistory(visitData.medical_history || '');
-            setInvestigations(visitData.investigations || '');
-            setAdvice(visitData.advice || '');
-            setFollowUp(visitData.follow_up_date || '');
-            
-            // C. Populate Exam
-            if (visitData.examination_findings) {
-                try {
-                    const parsedExam = typeof visitData.examination_findings === 'string' 
-                        ? JSON.parse(visitData.examination_findings) 
-                        : visitData.examination_findings;
-                    setExam({ ...exam, ...parsedExam });
-                } catch (e) { console.error("Error parsing exam data", e); }
-            }
-
-            // D. Populate Diagnosis
-            if (visitData.diagnosis) {
-                const lines = visitData.diagnosis.split('\n');
-                const parsedDiagnoses = lines.map(line => {
-                    // Extract "Description (Code)"
-                    const match = line.match(/^\d+\.\s+(.+)\s+\((.+)\)$/);
-                    if (match) return { description: match[1], code: match[2] };
-                    return null;
-                }).filter(Boolean);
                 
-                // If regex fails (e.g. manual entry), fallback to simple object
-                if (parsedDiagnoses.length === 0 && visitData.diagnosis) {
-                     setDiagnosesList([{ code: '', description: visitData.diagnosis }]);
-                } else {
-                     setDiagnosesList(parsedDiagnoses);
+                setPatient({
+                    name: patientData.name,
+                    gender: patientData.gender,
+                    id: patientData.patient_id,
+                    age: patientData.age,
+                    dob: patientData.dob || '',
+                    ageYears: '', ageMonths: '', ageDays: '',
+                    mobile: patientData.mobile || '',
+                    email: patientData.email || '',
+                    address: patientData.address || '',
+                    referred_by: patientData.referred_by || ''
+                });
+
+                setChiefComplaint(visitData.chief_complaint || '');
+                setHistory(visitData.medical_history || '');
+                setInvestigations(visitData.investigations || '');
+                setAdvice(visitData.advice || '');
+                setFollowUp(visitData.follow_up_date || '');
+                
+                if (visitData.examination_findings) {
+                    try {
+                        const parsedExam = typeof visitData.examination_findings === 'string' 
+                            ? JSON.parse(visitData.examination_findings) 
+                            : visitData.examination_findings;
+                        setExam({ ...exam, ...parsedExam });
+                    } catch (e) { }
+                }
+
+                if (visitData.diagnosis) {
+                    const lines = visitData.diagnosis.split('\n');
+                    const parsedDiagnoses = lines.map(line => {
+                        const match = line.match(/^\d+\.\s+(.+)\s+\((.+)\)$/);
+                        if (match) return { description: match[1], code: match[2] };
+                        return null;
+                    }).filter(Boolean);
+                    setDiagnosesList(parsedDiagnoses);
+                }
+
+                if (visitData.drugs) {
+                    const editPrescriptions = visitData.drugs.map(d => ({
+                        generic_name: d.name,
+                        trade_names: d.brand,
+                        strength: d.strength,
+                        sig_instruction: d.sig,
+                        duration: d.duration,
+                        quantity: d.quantity,
+                        drug_id: d.drug_id,
+                        counseling_points: d.counseling_points || '',
+                        tempId: Date.now() + Math.random()
+                    }));
+                    setPrescriptions(editPrescriptions);
+                }
+                setOriginalDate(visitData.raw_date);
+                // Load full history even in Edit Mode
+                if (patientData.patient_id) {
+                    fetchHistoryForCheck(patientData.patient_id);
                 }
             }
-
-            // E. Populate Prescriptions
-            if (visitData.drugs) {
-                const editPrescriptions = visitData.drugs.map(d => ({
-                    generic_name: d.name,
-                    trade_names: d.brand,
-                    strength: d.strength,
-                    sig_instruction: d.sig,
-                    duration: d.duration,
-                    quantity: d.quantity,
-                    drug_id: d.drug_id,
-                    counseling_points: d.counseling_points || '',
-                    tempId: Date.now() + Math.random()
-                }));
-                setPrescriptions(editPrescriptions);
-            }
-
-            // F. Set Metadata
-            setOriginalDate(visitData.raw_date);
             
-        }
-        // CASE B: QUEUE MODE (New Prescription from Dashboard)
-            else if (location.state.patientData) {
+            // CASE B: QUEUE MODE (Start Visit from Dashboard)
+            else if (location.state.queueMode && location.state.patientData) {
                 const p = location.state.patientData;
-                
-                // Pre-fill only Patient Details
+
+                setLinkedAppointmentId(p.appointment_id); // Store Appt ID to complete later
+
                 setPatient({
-                    name: p.patient_name || p.name, // Handle different field names from API
+                    name: p.patient_name || p.name, 
                     gender: p.gender,
                     id: p.patient_id,
-                    dob: p.dob || '',
-                    // Logic to calculate age or keep existing string
+                    dob: p.dob ? p.dob.split('T')[0] : '', 
                     age: p.age, 
                     ageYears: '', ageMonths: '', ageDays: '',
                     mobile: p.mobile || '',
@@ -172,14 +166,33 @@ function PrescriptionForm() {
                     referred_by: p.referred_by || ''
                 });
 
-                // Clear everything else to ensure it's a fresh start
+                // Clear Prescription fields for fresh start
                 setPrescriptions([]);
                 setDiagnosesList([]);
                 setAdvice('');
-                setOriginalDate(null); // Ensure this is NULL so it saves as New
+                setChiefComplaint(p.reason || ''); // Use booking reason as initial complaint!
+                setHistory('');
+                setInvestigations('');
+                setFollowUp('');
+                setExam({ bp: '', pulse: '', temp: '', weight: '', height: '', bmi: '', spo2: '', other: '' });
+                setOriginalDate(null);
+                
+                // Fetch history to see if returning
+                if (p.patient_id) fetchHistoryForCheck(p.patient_id);
             }
         }
     }, [location.state]);
+
+    const fetchHistoryForCheck = async (pid) => {
+        try {
+            const res = await fetch(`${VITE_API_URL}/patients/${pid}/history`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+            if (res.ok) {
+                const history = await res.json();
+                setIsReturningPatient(history.length > 0);
+                 setPatientHistory(history); 
+            }
+        } catch(e) {}
+    };
 
 
     // --- 3. INTERACTION CHECKER ---
@@ -207,9 +220,7 @@ function PrescriptionForm() {
     const handleAddDiagnosis = useCallback((newDiagnosis) => {
         setDiagnosesList(prevList => {
             const exists = prevList.find(d => d.code === newDiagnosis.code);
-            if (!exists) {
-                return [...prevList, newDiagnosis];
-            }
+            if (!exists) return [...prevList, newDiagnosis];
             return prevList;
         });
     }, []);
@@ -285,9 +296,10 @@ function PrescriptionForm() {
             tempId: Date.now() + Math.random()
         }));
         
-        // Filter valid drugs
         const validItems = newItems.filter(item => item.drug_id);
         
+        if (validItems.length < newItems.length) alert("Some items skipped (missing ID).");
+
         setPrescriptions(prev => [...prev, ...validItems]);
         setAdvice(pastPrescriptions[0].general_advice || '');
         alert('Items loaded!');
@@ -369,7 +381,6 @@ function PrescriptionForm() {
             setActiveTab('patient'); return; 
         }
 
-        // 1. Filter out invalid drugs
         const validPrescriptions = prescriptions.filter(p => p.drug_id);
         
         if (!validPrescriptions.length && prescriptions.length > 0) {
@@ -377,7 +388,6 @@ function PrescriptionForm() {
              return;
         }
 
-        // Age String
         let formattedAge = patient.age || ''; 
         if (patient.ageYears || patient.ageMonths || patient.ageDays) {
             const y = patient.ageYears ? `${patient.ageYears}Y ` : '';
@@ -386,7 +396,6 @@ function PrescriptionForm() {
             formattedAge = (y + m + d).trim();
         }
 
-        // Diagnosis String (From Array)
         const formattedDiagnosisString = diagnosesList.map((d, index) => 
             `${index + 1}. ${d.description} (${d.code})`
         ).join('\n');
@@ -395,15 +404,8 @@ function PrescriptionForm() {
             original_date: originalDate, 
             patient: { ...patient, id: patient.id, age: formattedAge },
             prescriptions: validPrescriptions.map(p => ({
-                drug_id: p.drug_id, 
-                quantity: p.quantity, 
-                sig_instruction: p.sig_instruction,
-                duration: p.duration, 
-                generic_name: p.generic_name, 
-                strength: p.strength, 
-                trade_names: p.trade_names,
-                manufacturer: p.manufacturer,
-                counseling_points: p.counseling_points 
+                drug_id: p.drug_id, quantity: p.quantity, sig_instruction: p.sig_instruction,
+                duration: p.duration, generic_name: p.generic_name, strength: p.strength, counseling_points: p.counseling_points, trade_names: p.trade_names,
             })),
             chief_complaint: chiefComplaint,
             medical_history: history,
@@ -431,10 +433,21 @@ function PrescriptionForm() {
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a'); a.href = url; a.download = 'prescription.pdf'; document.body.appendChild(a); a.click(); window.URL.revokeObjectURL(url);
                 
+                // --- NEW: Mark Appointment as COMPLETED ---
+                if (linkedAppointmentId) {
+                    await fetch(`${VITE_API_URL}/appointments/${linkedAppointmentId}/status`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                        body: JSON.stringify({ status: 'Completed' })
+                    });
+                }
+
                 alert(originalDate ? 'Updated & Printed!' : 'Created & Printed!');
 
-                // Redirect to Patient Record to view updated history
-                if (patient.id) {
+                // If starting from queue, go back to dashboard. If normal, show history.
+                if (location.state && location.state.queueMode) {
+                    navigate('/dashboard');
+                } else if (patient.id) {
                     navigate(`/patients/${patient.id}`);
                 } else {
                     // Fallback reset
@@ -444,6 +457,7 @@ function PrescriptionForm() {
                     setAdvice(''); setChiefComplaint(''); setHistory(''); setInvestigations(''); setFollowUp('');
                     setExam({ bp: '', pulse: '', temp: '', weight: '', height: '', bmi: '', spo2: '', other: '' });
                     setOriginalDate(null);
+                    setLinkedAppointmentId(null);
                 }
             } else {
                 alert('Error generating prescription');
@@ -451,7 +465,6 @@ function PrescriptionForm() {
         } catch (e) { console.error(e); alert('Network error'); }
     };
 
-    // --- HELPER: TAB CLASS ---
     const getTabClass = (tabName) => {
         const baseClass = "flex-1 py-3 text-sm font-medium text-center cursor-pointer transition-colors border-b-2";
         const activeClass = "border-indigo-600 text-indigo-600 bg-indigo-50";
@@ -462,9 +475,16 @@ function PrescriptionForm() {
     return (
         <div className="max-w-5xl mx-auto p-4 my-8 bg-white rounded-xl shadow-xl min-h-[600px] flex flex-col">
             <div className="flex justify-between items-center mb-6 px-2 border-b pb-2">
-                <h2 className="text-2xl font-bold text-indigo-700">
-                    {originalDate ? "Edit Prescription" : "New Prescription"}
-                </h2>
+                <div>
+                    <h2 className="text-2xl font-bold text-indigo-700">
+                        {originalDate ? "Edit Prescription" : "New Prescription"}
+                    </h2>
+                    {isReturningPatient && (
+                        <span className="text-xs font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-full mt-1 inline-block">
+                            ↻ Returning Patient
+                        </span>
+                    )}
+                </div>
                 {originalDate && (
                     <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full font-semibold">
                         Editing Mode
@@ -472,7 +492,6 @@ function PrescriptionForm() {
                 )}
             </div>
             
-            {/* TABS */}
             <div className="flex border-b border-gray-200 mb-6 overflow-x-auto">
                 <div onClick={() => setActiveTab('patient')} className={getTabClass('patient')}>1. Patient</div>
                 <div onClick={() => setActiveTab('assessment')} className={getTabClass('assessment')}>2. Assessment</div>
@@ -480,7 +499,6 @@ function PrescriptionForm() {
                 <div onClick={() => setActiveTab('notes')} className={getTabClass('notes')}>4. Advice</div>
             </div>
 
-            {/* TAB CONTENT */}
             <div className="flex-1">
                 {activeTab === 'patient' && (
                     <div className="animate-fade-in">
@@ -543,23 +561,11 @@ function PrescriptionForm() {
                             handleSaveInstructionBlock={handleSaveInstructionBlock} handleDeleteInstructionBlock={handleDeleteInstructionBlock}
                             editingInstructionBlock={editingInstructionBlock} setEditingInstructionBlock={setEditingInstructionBlock}
                             newInstructionBlock={newInstructionBlock} setNewInstructionBlock={setNewInstructionBlock}
-                            // --- NEW PROPS FOR AI ---
-                            diagnosisList={diagnosesList}  // Pass diagnosis array
-                            prescriptions={prescriptions}  // Pass medicine array
-
+                            diagnosisList={diagnosesList}
+                            prescriptions={prescriptions} 
                             followUp={followUp} 
                             setFollowUp={setFollowUp} 
-
                         />
-
-                        <div className="p-4 rounded border border-gray-300 shadow-sm">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Follow-up Instructions</label>
-                            <input 
-                                className="w-full p-2 border border-gray-300 rounded-md" 
-                                type="text" placeholder="e.g. After 7 days / When needed" 
-                                value={followUp} onChange={(e) => setFollowUp(e.target.value)} 
-                            />
-                        </div>
                         
                         <div className="flex justify-between mt-6 pt-4">
                             <button onClick={() => setActiveTab('medication')} className="text-gray-600 px-4 py-2">&larr; Back</button>

@@ -35,7 +35,14 @@ router.get('/', async (req, res) => {
         let query = `
             SELECT 
                 a.*, 
-                p.name as patient_name, p.mobile, p.age, p.gender,
+                p.name as patient_name, 
+                p.mobile, 
+                p.age, 
+                p.gender,
+                p.dob,          
+                p.address,      
+                p.email,        
+                p.referred_by,  
                 ds.start_time as session_start -- <--- THIS LINE IS REQUIRED
             FROM appointments a
             JOIN patients p ON a.patient_id = p.patient_id
