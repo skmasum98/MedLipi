@@ -15,7 +15,10 @@ function Home() {
                     <p className="text-xl text-gray-500 mb-10 max-w-2xl mx-auto">
                         MedLipi helps doctors generate professional prescriptions in seconds, track patient history, and manage drug interactions securely.
                     </p>
-                    <Link to="/find-doctors" className="text-indigo-600 font-semibold hover:underline">Find a Doctor</Link>
+                    <div className="flex flex-col sm:flex-row pb-10 justify-center gap-4">    
+                        <Link to="/find-doctors" className="flex items-center justify-center px-8 py-4 border border-transparent text-lg font-medium rounded-xl text-white bg-cyan-400 hover:bg-cyan-500 shadow-lg md:min-w-[200px] transition-transform transform hover:-translate-y-1">Find a Doctor</Link>
+                    </div>
+                    
 
                     {/* Dual Call to Action */}
                     <div className="flex flex-col sm:flex-row justify-center gap-4">
