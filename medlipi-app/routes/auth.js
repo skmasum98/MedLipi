@@ -68,7 +68,8 @@ router.post('/login', async (req, res) => {
             id: doctor.doctor_id,
             bmdc: doctor.bmdc_reg,
             name: doctor.full_name,
-            email: doctor.email
+            email: doctor.email,
+            role: "doctor" 
         };
         const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1d' });
 

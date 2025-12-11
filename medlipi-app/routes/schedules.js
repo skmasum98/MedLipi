@@ -54,20 +54,16 @@ router.delete('/:id', async (req, res) => {
     
     const scheduleId = req.params.id;
 
-    try {
-        // Optional: Check if appointments exist first to prevent deleting active data
-        // For now, we assume deleting schedule might nullify appointments or we cascade delete
-        // A safer approach is to update status to 'Closed' instead of delete.
-        // Let's doing HARD DELETE for now, but in prod use Soft Delete.
-        
+     try {
         await pool.query('DELETE FROM doctor_schedules WHERE schedule_id = ? AND doctor_id = ?', [scheduleId, req.user.id]);
         res.json({ message: 'Session deleted' });
     } catch (e) {
-        // Handle FK constraint error (if appointments exist)
-        if (e.code === 'ER_ROW_IS_REFERENCED_2') {
-            return res.status(400).json({ message: 'Cannot delete: This session has booked appointments. Cancel them first.' });
+        // --- Critical for Debugging ---
+        // 'ER_ROW_IS_REFERENCED_2' = Constraint Error (Patients have booked)
+        if (e.code === 'ER_ROW_IS_REFERENCED_2' || e.errno === 1451) {
+            return res.status(400).json({ message: 'This session has active appointments. Please cancel them first in the Schedule page.' });
         }
-        res.status(500).json({ message: 'Delete failed' });
+        res.status(500).json({ message: 'Delete failed (Server Error)' });
     }
 });
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router'; // Ensure react-router-dom
+import { Link, useNavigate } from 'react-router'; 
 import { useAuth } from '../hooks/useAuth';
 
 const VITE_API_URL = import.meta.env.VITE_API_URL;
@@ -21,7 +21,6 @@ function SessionManager() {
     // --- 1. Fetch Doctor's Own Sessions ---
     const fetchSessions = async () => {
         try {
-            // FIX: Use the specific endpoint for the doctor
             const res = await fetch(`${VITE_API_URL}/schedules/my-sessions`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -44,31 +43,44 @@ function SessionManager() {
             if (res.ok) {
                 alert('Session Created Successfully');
                 fetchSessions();
+            } else {
+                 alert('Error creating session');
             }
-        } catch (e) { alert('Error creating session'); }
+        } catch (e) { alert('Network Error'); }
     };
 
-    // --- Delete Handler ---
+    // --- Delete Handler (FIXED) ---
     const handleDelete = async (id) => {
-        if(!window.confirm("Delete this session? Note: You cannot delete sessions with active appointments.")) return;
+        if(!window.confirm("Delete this session? \nWarning: If patients have booked, you must cancel their appointments first.")) return;
+        
         try {
             const res = await fetch(`${VITE_API_URL}/schedules/${id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
+            
             if (res.ok) {
                 setSessions(sessions.filter(s => s.schedule_id !== id));
+                alert('Session deleted successfully.');
             } else {
-                const d = await res.json();
-                alert(d.message);
+                // Handle the 400 constraint error gracefully
+                const data = await res.json();
+                alert(`Cannot delete: ${data.message || 'Unknown error'}`);
             }
-        } catch (e) { alert('Error'); }
+        } catch (e) { 
+            console.error(e);
+            alert('Network Error'); 
+        }
     };
 
     // --- Navigation Handler ---
     const handleViewBookings = (dateString) => {
-        const dateOnly = new Date(dateString).toISOString().split('T')[0];
-        navigate('/appointments', { state: { targetDate: dateOnly, forceView: 'date' } });
+        // Fix Timezone issue for date passing
+        const dateOnly = new Date(dateString);
+        // Manually format to YYYY-MM-DD local to avoid UTC shift
+        const localDateStr = `${dateOnly.getFullYear()}-${String(dateOnly.getMonth()+1).padStart(2, '0')}-${String(dateOnly.getDate()).padStart(2, '0')}`;
+        
+        navigate('/appointments', { state: { targetDate: localDateStr, forceView: 'date' } });
     };
 
     return (
@@ -93,19 +105,35 @@ function SessionManager() {
                 
                 <form onSubmit={handleCreate} className="p-6">
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
+                        
+                        {/* Date */}
                         <div className="md:col-span-3">
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Date</label>
-                            <input type="date" required className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 transition-all" value={newSession.date} onChange={(e) => setNewSession({...newSession, date: e.target.value})} />
+                            <input 
+                                type="date" 
+                                required 
+                                className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 transition-all" 
+                                value={newSession.date} 
+                                onChange={(e) => setNewSession({...newSession, date: e.target.value})} 
+                            />
                         </div>
+
+                        {/* Shift */}
                         <div className="md:col-span-3">
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Shift Name</label>
-                            <select className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 transition-all" value={newSession.session_name} onChange={(e) => setNewSession({...newSession, session_name: e.target.value})}>
+                            <select 
+                                className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 transition-all" 
+                                value={newSession.session_name} 
+                                onChange={(e) => setNewSession({...newSession, session_name: e.target.value})}
+                            >
                                 <option>Morning</option>
                                 <option>Afternoon</option>
                                 <option>Evening</option>
                                 <option>Night</option>
                             </select>
                         </div>
+
+                        {/* Time Range */}
                         <div className="md:col-span-4">
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Duration</label>
                             <div className="flex items-center gap-2">
@@ -114,10 +142,14 @@ function SessionManager() {
                                 <input type="time" className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-center" value={newSession.end_time} onChange={(e) => setNewSession({...newSession, end_time: e.target.value})} />
                             </div>
                         </div>
+
+                        {/* Capacity */}
                         <div className="md:col-span-2">
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Capacity</label>
                             <input type="number" className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg" value={newSession.max_patients} onChange={(e) => setNewSession({...newSession, max_patients: e.target.value})} />
                         </div>
+
+                        {/* Submit */}
                         <div className="md:col-span-12 flex justify-end mt-2">
                             <button type="submit" className="bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-indigo-700 transform hover:-translate-y-0.5 transition-all flex items-center gap-2">
                                 + Create Session
@@ -143,11 +175,12 @@ function SessionManager() {
                         const percentage = Math.min((s.booked_count / s.max_patients) * 100, 100);
                         const isFull = s.booked_count >= s.max_patients;
                         
-                        // --- Expiration Logic ---
-                        // Compare session date (s.date) with Today. 
-                        // Note: Database date is usually Midnight UTC. Safe to compare just YYYY-MM-DD strings.
+                        // Compare Strings YYYY-MM-DD for accurate "Today" logic regardless of time
                         const todayStr = new Date().toISOString().split('T')[0];
-                        const sessionDateStr = new Date(s.date).toISOString().split('T')[0];
+                        // Convert DB date (Date object) to local YYYY-MM-DD string
+                        const sessionD = new Date(s.date);
+                        const sessionDateStr = `${sessionD.getFullYear()}-${String(sessionD.getMonth()+1).padStart(2,'0')}-${String(sessionD.getDate()).padStart(2,'0')}`;
+                        
                         const isExpired = sessionDateStr < todayStr;
 
                         return (
@@ -163,7 +196,6 @@ function SessionManager() {
                                             </h4>
                                         </div>
                                         
-                                        {/* Status Badge */}
                                         <div className={`px-2 py-1 rounded text-xs font-bold uppercase 
                                             ${isExpired ? 'bg-gray-200 text-gray-500' : 
                                               isFull ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
@@ -192,7 +224,7 @@ function SessionManager() {
                                 </div>
                                 
                                 {/* Footer Actions */}
-                                <div className="bg-gray-50 px-5 py-3 border-t border-gray-100 flex justify-end items-center">
+                                <div className="bg-gray-50 px-5 py-3 border-t border-gray-100 flex justify-between items-center">
                                     <button 
                                         onClick={() => handleDelete(s.schedule_id)}
                                         className="text-xs text-red-400 hover:text-red-600 font-medium hover:underline"
@@ -200,12 +232,13 @@ function SessionManager() {
                                         Delete
                                     </button>
                                     
-                                    {/* <button 
+                                    {/* FIX: Link the View Button */}
+                                    <button 
                                         onClick={() => handleViewBookings(s.date)} 
                                         className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1"
                                     >
                                         View Bookings &rarr;
-                                    </button> */}
+                                    </button>
                                 </div>
                             </div>
                         );
