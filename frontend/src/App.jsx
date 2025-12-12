@@ -36,6 +36,7 @@ import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import StaffManager from './pages/admin/StaffManager';
 import StaffLogin from './pages/staff/StaffLogin';
+import SessionCalendar from './pages/staff/SessionCalendar';
 
 
 function App() {
@@ -76,6 +77,7 @@ function App() {
                         <Route path="/reception-dashboard" element={<DashboardReception />} />
                         <Route path="/reception/schedule" element={<Appointments />} /> {/* Shared Component */}
                         <Route path="/reception/patients" element={<Patients />} /> {/* Shared Component */}
+                        <Route path="/reception/sessions" element={<SessionCalendar />} />
                     </Route>
 
                     {/* === 4. ASSISTANT ROUTES (Teal Header) === */}

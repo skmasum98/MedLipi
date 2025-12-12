@@ -1,78 +1,97 @@
 import express from 'express';
 import pool from '../db.js';
-import verifyToken from '../middleware/auth.js'; 
+import jwt from 'jsonwebtoken';
 
 const router = express.Router();
 
-// Middleware to verify User (Doc or Patient)
-// (Reuse the 'verifyAnyUser' logic from appointments.js or import it)
-// For brevity, I'm redefining a simple one here or assume you import it.
-import jwt from 'jsonwebtoken';
-
+// --- AUTH MIDDLEWARE (Inline version tailored for Schedules) ---
 const verifyAnyUser = (req, res, next) => {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).json({ message: 'No token' });
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ message: 'No token' });
+    
+    const token = authHeader.split(' ')[1];
     jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
         if (err) return res.status(403).json({ message: 'Invalid token' });
-        req.user = decoded;
+        req.user = decoded; 
+        
+        // Helper: Determine the "Operating Doctor ID"
+        // If I am a doctor -> My ID.
+        // If I am Staff -> My Boss's ID (parentId).
+        // If I am Patient -> Undefined (patients don't manage schedules).
+        if (req.user.role === 'doctor') {
+            req.operatingDoctorId = req.user.id;
+        } else if (['receptionist', 'assistant'].includes(req.user.role)) {
+            req.operatingDoctorId = req.user.parentId;
+        }
+
         next();
     });
 };
 
 router.use(verifyAnyUser);
 
-// --- DOCTOR: GET MY OWN SESSIONS (All: Past & Future) ---
+
+// --- 1. GET SESSIONS (Management View) ---
+// Returns schedules for the specific doctor (past & future)
 router.get('/my-sessions', async (req, res) => {
-    // 1. Security Check
-    if (req.user.role !== 'doctor' && !req.user.bmdc) {
-        return res.status(403).json({ message: "Access denied" });
-    }
+    // Only Doctor or Staff can see this management list
+    if (req.user.role === 'patient') return res.status(403).json({ message: "Access denied" });
 
     try {
         const query = `
             SELECT 
                 s.*, 
+                d.full_name as doctor_name, 
                 COUNT(a.appointment_id) as booked_count
             FROM doctor_schedules s
+            JOIN doctors d ON s.doctor_id = d.doctor_id -- <--- JOIN DOCTOR TABLE
             LEFT JOIN appointments a ON s.schedule_id = a.schedule_id AND a.status != 'Cancelled'
             WHERE s.doctor_id = ? 
             GROUP BY s.schedule_id
             ORDER BY s.date DESC, s.start_time ASC
         `;
-        // Use req.user.id (from token)
-        const [rows] = await pool.query(query, [req.user.id]);
+        
+        // Use the calculated Operating ID (Works for Doc & Receptionist)
+        const [rows] = await pool.query(query, [req.operatingDoctorId]);
         res.json(rows);
     } catch (e) {
         console.error(e);
-        res.status(500).json({ message: 'Error fetching my sessions' });
+        res.status(500).json({ message: 'Error fetching sessions' });
     }
 });
 
-// --- DOCTOR: DELETE SESSION ---
+
+// --- 2. DELETE SESSION ---
 router.delete('/:id', async (req, res) => {
-    if (req.user.role !== 'doctor') return res.status(403).json({ message: "Unauthorized" });
+    if (req.user.role === 'patient') return res.status(403).json({ message: "Unauthorized" });
     
     const scheduleId = req.params.id;
 
      try {
-        await pool.query('DELETE FROM doctor_schedules WHERE schedule_id = ? AND doctor_id = ?', [scheduleId, req.user.id]);
+        // Only delete if the schedule belongs to the operating doctor
+        await pool.query(
+            'DELETE FROM doctor_schedules WHERE schedule_id = ? AND doctor_id = ?', 
+            [scheduleId, req.operatingDoctorId]
+        );
         res.json({ message: 'Session deleted' });
     } catch (e) {
-        // --- Critical for Debugging ---
-        // 'ER_ROW_IS_REFERENCED_2' = Constraint Error (Patients have booked)
+        // FK Constraint Handling
         if (e.code === 'ER_ROW_IS_REFERENCED_2' || e.errno === 1451) {
-            return res.status(400).json({ message: 'This session has active appointments. Please cancel them first in the Schedule page.' });
+            return res.status(400).json({ message: 'This session has active appointments. Cancel them first via the Schedule page.' });
         }
         res.status(500).json({ message: 'Delete failed (Server Error)' });
     }
 });
 
-// --- DOCTOR: CREATE SESSION ---
+
+// --- 3. CREATE SESSION ---
 router.post('/create', async (req, res) => {
-    if (req.user.role === 'patient') return res.status(403).json({message: "Patients cannot create schedules"});
+    if (req.user.role === 'patient') return res.status(403).json({ message: "Forbidden" });
 
     const { date, session_name, start_time, end_time, max_patients } = req.body;
-    const doctorId = req.user.id;
+    
+    // Automatically assigned to the correct doctor
+    const doctorId = req.operatingDoctorId; 
 
     try {
         await pool.query(
@@ -87,40 +106,63 @@ router.post('/create', async (req, res) => {
     }
 });
 
-// --- PUBLIC/PATIENT: GET AVAILABLE SESSIONS ---
+
+// --- 4. PUBLIC: GET AVAILABLE SESSIONS (Used by Booking Modal) ---
 router.get('/available', async (req, res) => {
     try {
-        // Fetch sessions where date >= today and status is Open
-        // ALSO count how many appointments are already booked for each
-        const query = `
+        // Logic: Show ALL future open sessions from ALL doctors (Directory style)
+        // Or if patient came from a specific doctor's page, you might filter by ?doctor_id=
+        
+        let query = `
             SELECT 
                 s.*, 
+                doc.clinic_name, doc.full_name as doctor_name,
                 COUNT(a.appointment_id) as booked_count
             FROM doctor_schedules s
+            JOIN doctors doc ON s.doctor_id = doc.doctor_id
             LEFT JOIN appointments a ON s.schedule_id = a.schedule_id AND a.status != 'Cancelled'
             WHERE s.date >= CURDATE()
+        `;
+        
+        // Optional filtering if frontend passes ?doctor_id=5
+        const queryParams = [];
+        if (req.query.doctor_id) {
+            query += ` AND s.doctor_id = ?`;
+            queryParams.push(req.query.doctor_id);
+        }
+
+        query += `
             GROUP BY s.schedule_id
             ORDER BY s.date ASC, s.start_time ASC
         `;
-        const [rows] = await pool.query(query);
+
+        const [rows] = await pool.query(query, queryParams);
         res.json(rows);
     } catch (e) {
         console.error(e);
-        res.status(500).json({ message: 'Error fetching schedules' });
+        res.status(500).json({ message: 'Error fetching available slots' });
     }
 });
 
-// --- PATIENT: BOOK A SERIAL ---
+
+// --- 5. BOOK A SERIAL (Transaction) ---
 router.post('/book-serial', async (req, res) => {
     const { schedule_id, patient_id } = req.body;
+    
+    // If Patient is booking -> use their own ID
+    // If Staff is booking -> use the passed 'patient_id'
     const actualPatientId = req.user.role === 'patient' ? req.user.id : patient_id;
+
+    if (!actualPatientId) {
+         return res.status(400).json({ message: "Patient ID missing." });
+    }
 
     let connection;
     try {
         connection = await pool.getConnection();
         await connection.beginTransaction();
 
-        // 0. PREVENT DUPLICATE: Check if patient already booked this session
+        // A. Prevent Duplicate Booking
         const [existing] = await connection.query(
             `SELECT appointment_id FROM appointments 
              WHERE schedule_id = ? AND patient_id = ? AND status != 'Cancelled'`,
@@ -128,19 +170,18 @@ router.post('/book-serial', async (req, res) => {
         );
 
         if (existing.length > 0) {
-            throw new Error('You have already booked a serial for this session.');
+            throw new Error('This patient already has a booking for this session.');
         }
 
-        // 1. Check if Slot is Full
+        // B. Check Capacity
         const [schedule] = await connection.query(
             `SELECT * FROM doctor_schedules WHERE schedule_id = ? FOR UPDATE`, 
             [schedule_id]
         );
-        
         if (schedule.length === 0) throw new Error('Schedule not found');
+        
         const session = schedule[0];
 
-        // 2. Count current bookings
         const [countRes] = await connection.query(
             `SELECT COUNT(*) as count FROM appointments WHERE schedule_id = ? AND status != 'Cancelled'`,
             [schedule_id]
@@ -150,20 +191,18 @@ router.post('/book-serial', async (req, res) => {
             throw new Error('Sorry, this session is full.');
         }
 
-        // 3. Generate Next Serial
+        // C. Calculate Serial & Status
         const nextSerial = countRes[0].count + 1;
+        // Staff bookings are auto-confirmed; Patient bookings are Pending
+        const status = req.user.role === 'patient' ? 'Pending_Confirmation' : 'Confirmed';
+        const source = req.user.role === 'patient' ? 'Online' : 'Reception';
 
-        // 4. Calculate Approximate Time (Bonus Feature)
-        // If Session starts at 09:00:00, and avg time is 15 mins
-        // We can actually insert a tentative 'visit_time' here!
-        // Start Time + (Serial-1 * 15 mins)
-        // But for now, keeping it simple (Time is NULL until confirmed)
-
+        // D. Insert
         await connection.query(
             `INSERT INTO appointments 
             (doctor_id, patient_id, schedule_id, visit_date, serial_number, source, status, reason)
-            VALUES (?, ?, ?, ?, ?, ?, 'Confirmed', 'Portal Request')`,
-            [session.doctor_id, actualPatientId, schedule_id, session.date, nextSerial, 'Online']
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [session.doctor_id, actualPatientId, schedule_id, session.date, nextSerial, source, status, 'Standard Appointment']
         );
 
         await connection.commit();
@@ -171,7 +210,7 @@ router.post('/book-serial', async (req, res) => {
 
     } catch (e) {
         if (connection) await connection.rollback();
-        // Send the specific error message (e.g. "Already booked")
+        console.error(e);
         res.status(400).json({ message: e.message || 'Booking failed' });
     } finally {
         if (connection) connection.release();

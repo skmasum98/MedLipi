@@ -13,25 +13,30 @@ const verifyAnyUser = (req, res, next) => {
     jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
         if (err) return res.status(403).json({ message: 'Invalid token' });
         req.user = decoded; 
+        
+        // Helper: Who is the "Operating Doctor"?
+        if (req.user.role === 'doctor') req.operatingDoctorId = req.user.id;
+        else if (req.user.role === 'receptionist' || req.user.role === 'assistant') req.operatingDoctorId = req.user.parentId;
+        
         next();
     });
 };
 
 router.use(verifyAnyUser);
 
-// --- GET Appointments (Doctor View) ---
+// --- GET Appointments (Doctor OR Staff View) ---
 router.get('/', async (req, res) => {
     const { date, type } = req.query; // type='upcoming'
 
-    // Security: Only Doctors (or authorized staff)
-    if (req.user.role !== 'doctor' && !req.user.bmdc) {
-         return res.status(403).json({ message: 'Access denied.' });
+    // FIX 1: Allow Receptionists and Assistants to see the schedule too!
+    if (req.user.role === 'patient') {
+         return res.status(403).json({ message: 'Access denied for patients.' });
     }
 
-    const doctorId = req.user.id; 
+    // Use the derived Doctor ID (Doctor's Own ID or Staff's Boss ID)
+    const doctorId = req.operatingDoctorId; 
 
     try {
-        // FIX: Changed 'const' to 'let' so we can append string conditions
         let query = `
             SELECT 
                 a.*, 
@@ -43,10 +48,10 @@ router.get('/', async (req, res) => {
                 p.address,      
                 p.email,        
                 p.referred_by,  
-                ds.start_time as session_start -- <--- THIS LINE IS REQUIRED
+                ds.start_time as session_start
             FROM appointments a
             JOIN patients p ON a.patient_id = p.patient_id
-            LEFT JOIN doctor_schedules ds ON a.schedule_id = ds.schedule_id -- <--- JOIN REQUIRED
+            LEFT JOIN doctor_schedules ds ON a.schedule_id = ds.schedule_id
             WHERE a.doctor_id = ?
         `;
         
@@ -70,18 +75,22 @@ router.get('/', async (req, res) => {
     }
 });
 
-// --- POST Create Appointment ---
+// --- POST Create Appointment (Legacy / Manual) ---
+// Note: This is for manual bookings without Serial/Session logic
 router.post('/', async (req, res) => {
     const { patient_id, visit_date, visit_time, reason, source } = req.body;
     
     let doctorId, finalPatientId, finalSource;
 
     if (req.user.role === 'patient') {
+        // Patients should ideally use the 'book-serial' route for new system
+        // But for fallback compatibility:
         doctorId = req.body.doctor_id || 1; 
         finalPatientId = req.user.id; 
         finalSource = 'Online';
     } else {
-        doctorId = req.user.id;
+        // Doctor or Staff
+        doctorId = req.operatingDoctorId; // Using helper set in middleware
         finalPatientId = patient_id;
         finalSource = source || 'Reception';
     }
@@ -103,6 +112,8 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { visit_date, visit_time, reason, status } = req.body;
+    
+    if (req.user.role === 'patient') return res.status(403).json({message: "Unauthorized"});
 
     try {
         await pool.query(
@@ -136,6 +147,8 @@ router.put('/:id/status', async (req, res) => {
 
 // --- DELETE Appointment ---
 router.delete('/:id', async (req, res) => {
+    if (req.user.role === 'patient') return res.status(403).json({message: "Unauthorized"});
+    
     const { id } = req.params;
     try {
         await pool.query('DELETE FROM appointments WHERE appointment_id = ?', [id]);
