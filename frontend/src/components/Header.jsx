@@ -69,6 +69,7 @@ function Header() {
                                     <Link to="/patients" className={navLinkClass('/patients')}>Patients</Link>
                                     <Link to="/inventory" className={navLinkClass('/inventory')}>Drugs DB</Link>
                                     <Link to="/appointments" className={navLinkClass('/appointments')}>Appointments</Link>
+                                    <Link to="/staff-manager" className={navLinkClass('/staff-manager')}>Staff Manager</Link>
                                     
                                     <div className="ml-4 flex items-center gap-3">
                                         <Link to="/profile" className="flex items-center gap-2 text-white hover:text-indigo-200">
@@ -136,6 +137,7 @@ function Header() {
                                 <Link to="/patients" onClick={() => setIsMenuOpen(false)} className={mobileLinkClass('/patients')}>Patients</Link>
                                 <Link to="/inventory" onClick={() => setIsMenuOpen(false)} className={mobileLinkClass('/inventory')}>Drugs Database</Link>
                                 <Link to="/appointments" onClick={() => setIsMenuOpen(false)} className={mobileLinkClass('/appointments')}>Appointments</Link>
+                                <Link to="/staff-manager" onClick={() => setIsMenuOpen(false)} className={mobileLinkClass('/staff-manager')}>Staff Manager</Link>
                                 
                                 <div className="border-t border-indigo-600 my-2 pt-2">
                                     <div className="flex items-center px-3 mb-3">

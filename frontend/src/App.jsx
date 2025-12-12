@@ -1,16 +1,16 @@
 import React from 'react';
-// FIX: Changed 'react-router' to 'react-router-dom' for standard web routing
-import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router'; // Updated to 'react-router' as per your version
 import { AuthProvider, useAuth } from './hooks/useAuth'; 
 import ProtectedRoute from './components/ProtectedRoute'; 
 
-// --- Navigation Components ---
-import Header from './components/Header';           // Doctor's Blue Header
-import PatientHeader from './components/PatientHeader'; // Patient/Public White Header
+// Layouts
+import PublicLayout from './layouts/PublicLayout';
+import DoctorLayout from './layouts/DoctorLayout';
+import ReceptionLayout from './layouts/ReceptionLayout';
+import AssistantLayout from './layouts/AssistantLayout';
 
-// --- Page Imports ---
-// Public & Patient Pages
-import Home from './pages/Home'; 
+// Pages
+import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import FindDoctors from './pages/FindDoctors';
@@ -19,104 +19,99 @@ import PatientRegister from './pages/PatientRegister';
 import PatientDashboard from './pages/PatientDashboard';
 import PublicDownload from './pages/PublicDownload';
 
-// Doctor Protected Pages
-import Dashboard from './pages/Dashboard';
+// Role Dashboards & Pages
+import DashboardDoctor from './pages/DashboardDoctor'; // (Or the generic switcher if you kept it)
+import DashboardReception from './pages/dashboards/DashboardReception';
+import DashboardAssistant from './pages/dashboards/DashboardAssistant';
 import PrescriptionForm from './pages/PrescriptionForm';
 import Inventory from './pages/Inventory';
-import Settings from './pages/Settings';
 import Patients from './pages/Patients';
-import PatientRecord from './pages/PatientRecord';
 import Appointments from './pages/Appointments';
 import SessionManager from './pages/SessionManager';
+import Settings from './pages/Settings';
 
-// --- Layout Manager Component ---
-// Decides which Header to show based on the URL path
-function Layout() {
-    const location = useLocation();
-    
-    // List of route prefixes that belong to the "Doctor Portal"
-    const doctorRoutes = [
-        '/dashboard', 
-        '/prescription', 
-        '/inventory', 
-        '/profile', 
-        '/patients', 
-        '/appointments',
-        '/session'
-    ];
+import PatientRecord from './pages/PatientRecord';
 
-    // Check logic
-    const isDoctorRoute = doctorRoutes.some(path => location.pathname.startsWith(path));
-    const isPublicDownload = location.pathname.startsWith('/p/');
+import AdminLogin from './pages/admin/AdminLogin';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import StaffManager from './pages/admin/StaffManager';
+import StaffLogin from './pages/staff/StaffLogin';
 
-    return (
-        <>
-            {/* 1. DOCTOR HEADER (Blue) - Only on Doctor Routes */}
-            {isDoctorRoute && <Header />}
 
-            {/* 2. PATIENT HEADER (White) - On all other pages EXCEPT Public Download */}
-            {!isDoctorRoute && !isPublicDownload && <PatientHeader />}
-            
-            {/* Main Content Area */}
-            {/* Doctor Dashboard gets specific padding/bg, others take full screen defaults */}
-            <main className={isDoctorRoute ? "pt-4 pb-10 bg-gray-50 min-h-screen" : "min-h-screen"}>
-                <Routes>
-                    
-                    {/* --- PUBLIC & PATIENT ROUTES (White Header) --- */}
-                    <Route path="/" element={<Home />} />
-                    <Route path="/login" element={<Login />} /> 
-                    <Route path="/register" element={<Register />} />
-                    
-                    <Route path="/find-doctors" element={<FindDoctors />} />
-                    <Route path="/patient/login" element={<PatientLogin />} />
-                    <Route path="/patient/register" element={<PatientRegister />} />
-                    <Route path="/my-health" element={<PatientDashboard />} />
-
-                    {/* --- ISOLATED ROUTES (No Header) --- */}
-                    <Route path="/p/:uid" element={<PublicDownload />} /> 
-
-                    {/* --- DOCTOR PROTECTED ROUTES (Blue Header) --- */}
-                    <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                    <Route path="/prescription/new" element={<ProtectedRoute><PrescriptionForm /></ProtectedRoute>} />
-                    <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
-                    <Route path="/profile" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-                    
-                    {/* Patient Management */}
-                    <Route path="/patients" element={<ProtectedRoute><Patients /></ProtectedRoute>} />
-                    <Route path="/patients/:id" element={<ProtectedRoute><PatientRecord /></ProtectedRoute>} />
-                    
-                    {/* Scheduling */}
-                    <Route path="/appointments" element={<ProtectedRoute><Appointments /></ProtectedRoute>} />
-                    <Route path="/session" element={<ProtectedRoute><SessionManager /></ProtectedRoute>} />
-                                        
-                    {/* Fallback Redirect */}
-                    <Route path="*" element={<HomeRedirect />} />
-
-                </Routes>
-            </main>
-        </>
-    );
-}
-
-// --- Main App Component ---
 function App() {
     return (
         <Router>
             <AuthProvider>
-                <Layout />
+                <Routes>
+
+                    {/* === 1. PUBLIC ROUTES (Wrapped in PublicLayout) === */}
+                    <Route element={<PublicLayout />}>
+                        <Route path="/" element={<Home />} />
+                        <Route path="/login" element={<Login />} /> 
+                        <Route path="/register" element={<Register />} />
+                        <Route path="/find-doctors" element={<FindDoctors />} />
+                        
+                        {/* Patient Portal Pages can share PublicLayout (Header) */}
+                        <Route path="/patient/login" element={<PatientLogin />} />
+                        <Route path="/patient/register" element={<PatientRegister />} />
+                        <Route path="/my-health" element={<PatientDashboard />} />
+                    </Route>
+
+                    {/* === 2. DOCTOR ROUTES (Blue Header) === */}
+                    <Route element={<ProtectedRoute allowedRoles={['doctor']}><DoctorLayout /></ProtectedRoute>}>
+                        <Route path="/dashboard" element={<DashboardDoctor />} />
+                        <Route path="/prescription/new" element={<PrescriptionForm />} />
+                        <Route path="/inventory" element={<Inventory />} />
+                        <Route path="/profile" element={<Settings />} />
+                        <Route path="/patients" element={<Patients />} />
+                        <Route path="/patients/:id" element={<PatientRecord />} />
+                        <Route path="/appointments" element={<Appointments />} />
+                        <Route path="/session" element={<SessionManager />} />
+                        <Route path="/staff-manager" element={<StaffManager />} />
+                    </Route>
+
+                    {/* === 3. RECEPTION ROUTES (Purple Header) === */}
+                    <Route path='staff/login' element={<StaffLogin />} />
+                    <Route element={<ProtectedRoute allowedRoles={['receptionist']}><ReceptionLayout /></ProtectedRoute>}>
+                        <Route path="/reception-dashboard" element={<DashboardReception />} />
+                        <Route path="/reception/schedule" element={<Appointments />} /> {/* Shared Component */}
+                        <Route path="/reception/patients" element={<Patients />} /> {/* Shared Component */}
+                    </Route>
+
+                    {/* === 4. ASSISTANT ROUTES (Teal Header) === */}
+                    <Route element={<ProtectedRoute allowedRoles={['assistant']}><AssistantLayout /></ProtectedRoute>}>
+                        <Route path="/assistant-dashboard" element={<DashboardAssistant />} />
+                        <Route path="/assistant/vitals" element={<PrescriptionForm />} /> {/* Shared Component in 'Vitals' mode */}
+                    </Route>
+
+                    {/* === 5. ADMIN ROUTES (Standalone) === */}
+                    <Route path="/admin/login" element={<AdminLogin />} />
+                    <Route path="/admin/dashboard" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+
+                    {/* === 6. NO LAYOUT ROUTES === */}
+                    <Route path="/p/:uid" element={<PublicDownload />} /> 
+                    
+                    {/* Fallback */}
+                    <Route path="*" element={<HomeRedirect />} />
+
+                </Routes>
             </AuthProvider>
         </Router>
     );
 }
 
-// --- Helper: Redirect Logic ---
+// Redirect Helper
 function HomeRedirect() {
-    const { isAuthenticated, isLoading } = useAuth();
+    const { isAuthenticated, isLoading, doctor } = useAuth();
+    if (isLoading) return <div className="h-screen flex items-center justify-center text-gray-500">Loading...</div>; 
     
-    if (isLoading) return <div className="p-10 text-center text-gray-500">Loading...</div>; 
-    
-    // If logged in as Doctor -> Dashboard, otherwise -> Home
-    return <Navigate to={isAuthenticated ? "/dashboard" : "/"} replace />;
+    if (isAuthenticated) {
+        if (doctor?.role === 'super_admin') return <Navigate to="/admin/dashboard" replace />;
+        if (doctor?.role === 'receptionist') return <Navigate to="/reception-dashboard" replace />;
+        if (doctor?.role === 'assistant') return <Navigate to="/assistant-dashboard" replace />;
+        return <Navigate to="/dashboard" replace />; // Default Doctor
+    }
+    return <Navigate to="/" replace />;
 }
 
 export default App;

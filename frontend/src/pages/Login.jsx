@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth'; 
-import { Link } from 'react-router'; 
+import { Link, Navigate, useNavigate } from 'react-router'; 
 
 
 function Login() { 
     const [formData, setFormData] = useState({ email: '', password: '' });
     const [message, setMessage] = useState('');
+
+    const navigate = useNavigate();
     
     // Get the login function from context
     const { login } = useAuth(); 
@@ -33,6 +35,7 @@ function Login() {
                 // Login function from useAuth handles setting token and navigation
                 login(data.token); 
                 setMessage('Login successful!');
+                navigate('/dashboard');
                 
             } else {
                 setMessage(`Login failed: ${data.message || 'Invalid credentials'}`);
@@ -109,6 +112,15 @@ function Login() {
                     <span className="font-medium text-gray-600">Don't have an account? </span>
                     <Link to="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
                         Register here
+                    </Link>
+                </div>
+                <div className="text-sm text-center gap-30px flex justify-center">
+                    <span className="font-medium text-gray-600">Staff / Admin? </span>
+                    <Link to="/staff/login" className="font-medium text-indigo-600 hover:text-indigo-500 pr-10">
+                        Staff Login
+                    </Link>
+                    <Link to="/admin/login" className="font-medium text-indigo-600 hover:text-indigo-500">
+                        Admin Login
                     </Link>
                 </div>
             </div>

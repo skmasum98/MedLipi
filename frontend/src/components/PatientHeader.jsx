@@ -96,7 +96,7 @@ function PatientHeader() {
                         ) : (
                             <>
                                 <div className="border-t border-gray-100 my-2"></div>
-                                <Link to="/patient/login" onClick={() => setIsMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-green-700 font-bold">Patient Login</Link>
+                                <Link to="/patient/login" onClick={() => setIsMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-green-700">Patient Login</Link>
                                 <Link to="/dashboard" onClick={() => setIsMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-gray-500">Doctor Login</Link>
                             </>
                         )}

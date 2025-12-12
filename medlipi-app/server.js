@@ -22,6 +22,8 @@ import clinicalTemplateRoutes from './routes/clinical_templates.js';
 import aiRoutes from './routes/ai.js';
 import appointmentRoutes from './routes/appointments.js';
 import scheduleRoutes from './routes/schedules.js';
+import adminRoutes from './routes/admin.js';
+import staffRoutes from './routes/staff.js';
 
 // Initialize Express App
 const app = express();
@@ -54,6 +56,8 @@ app.use('/api/clinical-templates', clinicalTemplateRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/schedules', scheduleRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/staff', staffRoutes);
 
 // Start Server
 app.listen(PORT, () => {

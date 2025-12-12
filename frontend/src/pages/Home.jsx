@@ -72,7 +72,7 @@ function Home() {
                         <p className="text-gray-400 text-sm mt-1">Healthcare Platform</p>
                     </div>
                     <div className="flex gap-6 text-gray-500 text-sm">
-                        <Link to="/login" className="hover:text-indigo-600">Admin Login</Link>
+                        <Link to="/admin/login" className="hover:text-indigo-600">Admin Login</Link>
                         <a href="#" className="hover:text-indigo-600">Privacy Policy</a>
                         <a href="#" className="hover:text-indigo-600">GitHub</a>
                     </div>
