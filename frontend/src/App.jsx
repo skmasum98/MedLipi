@@ -38,6 +38,7 @@ import StaffManager from './pages/admin/StaffManager';
 import StaffLogin from './pages/staff/StaffLogin';
 import SessionCalendar from './pages/staff/SessionCalendar';
 import WalkInEntry from './pages/WalkInEntry';
+import ReceptionAppointments from './pages/staff/ReceptionAppointments';
 
 
 function App() {
@@ -76,10 +77,11 @@ function App() {
                     <Route path='staff/login' element={<StaffLogin />} />
                     <Route element={<ProtectedRoute allowedRoles={['receptionist']}><ReceptionLayout /></ProtectedRoute>}>
                         <Route path="/reception-dashboard" element={<DashboardReception />} />
-                        <Route path="/reception/schedule" element={<Appointments />} /> {/* Shared Component */}
+                        <Route path="/reception/schedule" element={<ReceptionAppointments />} /> {/* Shared Component */}
                         <Route path="/reception/patients" element={<Patients />} /> {/* Shared Component */}
                         <Route path="/reception/sessions" element={<SessionCalendar />} />
                         <Route path="/reception/walk-in" element={<WalkInEntry />} /> 
+                        <Route path='/reception/manage-session' element={<SessionManager />} /> {/* Shared Component */}
                     </Route>
 
                     {/* === 4. ASSISTANT ROUTES (Teal Header) === */}

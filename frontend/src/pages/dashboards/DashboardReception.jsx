@@ -170,7 +170,7 @@ function DashboardReception() {
                                                 Check Out
                                             </button>
                                         )}
-                                        <button onClick={() => navigate('/appointments')} className="text-xs text-indigo-500 hover:underline">Edit</button>
+                                        <button onClick={() => navigate('/reception/schedule')} className="text-xs text-indigo-500 hover:underline">Edit</button>
                                     </td>
                                 </tr>
                             ))}
