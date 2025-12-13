@@ -5,60 +5,22 @@ import verifyToken from '../middleware/auth.js';
 const router = express.Router();
 router.use(verifyToken); 
 
-// --- GET All Patients (Paginated Search) ---
-// router.get('/', async (req, res) => {
-//     const { q, page = 1, limit = 20 } = req.query;
-//     const offset = (page - 1) * limit;
-//     const doctorId = req.doctor.id;
-//     const searchTerm = q ? `%${q}%` : '%';
 
-//     try {
-//         const query = `
-//             SELECT 
-//                 p.patient_id, p.name, p.age, p.gender,
-//                 MAX(pr.created_at) as last_visit
-//             FROM patients p
-//             JOIN prescriptions pr ON p.patient_id = pr.patient_id
-//             WHERE pr.doctor_id = ? AND p.name LIKE ?
-//             GROUP BY p.patient_id
-//             ORDER BY last_visit DESC
-//             LIMIT ? OFFSET ?
-//         `;
-        
-//         const countQuery = `
-//             SELECT COUNT(DISTINCT p.patient_id) as total
-//             FROM patients p
-//             JOIN prescriptions pr ON p.patient_id = pr.patient_id
-//             WHERE pr.doctor_id = ? AND p.name LIKE ?
-//         `;
-
-//         const [patients] = await pool.query(query, [doctorId, searchTerm, parseInt(limit), parseInt(offset)]);
-//         const [countResult] = await pool.query(countQuery, [doctorId, searchTerm]);
-
-//         res.json({
-//             data: patients,
-//             pagination: {
-//                 total: countResult[0].total,
-//                 page: parseInt(page),
-//                 pages: Math.ceil(countResult[0].total / limit)
-//             }
-//         });
-//     } catch (error) {
-//         console.error('Error fetching patients:', error);
-//         res.status(500).json({ message: 'Server error.' });
-//     }
-// });
 
 // --- GET All Patients (Search + Filter + Pagination) ---
 router.get('/', async (req, res) => {
     const { 
         q, page = 1, limit = 10, 
         gender, address, diagnosis, 
-        startDate, endDate // <--- New Params
+        startDate, endDate //
     } = req.query;
 
     const offset = (page - 1) * limit;
-    const doctorId = req.doctor.id;
+   const doctorId = (req.user.role === 'doctor') 
+        ? req.user.id 
+        : req.user.parentId;
+
+    if (!doctorId) return res.status(403).json({ message: "No doctor association found" });
     const searchTerm = q ? `%${q}%` : '%';
 
     try {
