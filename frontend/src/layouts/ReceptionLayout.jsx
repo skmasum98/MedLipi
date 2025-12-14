@@ -15,8 +15,9 @@ function ReceptionLayout() {
                     </div>
                     <div className="flex gap-4 text-sm font-medium items-center">
                         <Link to="/reception-dashboard" className="hover:text-purple-200">Live Queue</Link>
-                        <Link to="/patient/register" className="hover:text-purple-200">Register New</Link>
-                        <Link to="/appointments" className="hover:text-purple-200">Schedule</Link>
+                        <Link to="/reception/walk-in" className="hover:text-purple-200">Register New</Link>
+                        <Link to="/reception/sessions" className="hover:text-purple-200">Session Planner</Link>
+                        <Link to="/reception/schedule" className="hover:text-purple-200">Schedule</Link>
                         
                         <div className="h-4 w-px bg-purple-600"></div>
                         

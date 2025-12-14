@@ -190,7 +190,7 @@ function SessionManager() {
                                 <div key={s.schedule_id} className={`flex flex-col md:flex-row items-center border rounded-lg p-4 transition hover:shadow-md ${isExpired ? 'bg-gray-50 opacity-60' : 'bg-white'}`}>
                                     
                                     {/* Left: Date Block */}
-                                    <div className="flex flex-col items-center justify-center p-3 rounded-md bg-gray-100 min-w-[80px]">
+                                    <div className="flex flex-col items-center justify-center p-3 rounded-md bg-gray-100 min-w-20">
                                         <span className="text-xs font-bold uppercase text-gray-500">{new Date(s.date).toLocaleDateString(undefined, {weekday: 'short'})}</span>
                                         <span className="text-2xl font-bold text-gray-800">{new Date(s.date).getDate()}</span>
                                         <span className="text-xs font-bold text-gray-500">{new Date(s.date).toLocaleDateString(undefined, {month: 'short'})}</span>

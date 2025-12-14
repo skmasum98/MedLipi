@@ -183,7 +183,7 @@ function WalkInEntry() {
             
             {/* --- SUCCESS MODAL --- */}
             {successData && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                     <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center animate-in fade-in zoom-in duration-300">
                         <div className="flex justify-center mb-4"><CheckCircleIcon /></div>
                         <h2 className="text-2xl font-bold text-gray-800 mb-2">Booking Confirmed!</h2>
