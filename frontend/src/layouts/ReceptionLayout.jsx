@@ -10,8 +10,10 @@ function ReceptionLayout() {
             <nav className="bg-purple-700 text-white shadow-lg sticky top-0 z-50">
                 <div className="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
                      <div className="flex items-center gap-2">
+                        <Link to="/reception-dashboard" className="hover:text-purple-200">
                          <span className="text-xl">🏥</span>
                          <span className="font-bold text-lg">Reception Desk</span>
+                        </Link>
                     </div>
                     <div className="flex gap-4 text-sm font-medium items-center">
                         <Link to="/reception-dashboard" className="hover:text-purple-200">Live Queue</Link>
