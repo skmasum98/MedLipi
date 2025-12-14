@@ -110,39 +110,33 @@ router.post('/create', async (req, res) => {
 // --- 4. PUBLIC: GET AVAILABLE SESSIONS (Used by Booking Modal) ---
 router.get('/available', async (req, res) => {
     try {
-        // Logic: Show ALL future open sessions from ALL doctors (Directory style)
-        // Or if patient came from a specific doctor's page, you might filter by ?doctor_id=
-        
-        let query = `
-            SELECT 
-                s.*, 
-                doc.clinic_name, doc.full_name as doctor_name,
-                COUNT(a.appointment_id) as booked_count
-            FROM doctor_schedules s
-            JOIN doctors doc ON s.doctor_id = doc.doctor_id
-            LEFT JOIN appointments a ON s.schedule_id = a.schedule_id AND a.status != 'Cancelled'
-            WHERE s.date >= CURDATE()
-        `;
-        
-        // Optional filtering if frontend passes ?doctor_id=5
-        const queryParams = [];
-        if (req.query.doctor_id) {
-            query += ` AND s.doctor_id = ?`;
-            queryParams.push(req.query.doctor_id);
+        if (!req.operatingDoctorId) {
+            return res.status(403).json({ message: 'Doctor context missing' });
         }
 
-        query += `
+        const query = `
+            SELECT 
+                s.*, 
+                COUNT(a.appointment_id) AS booked_count
+            FROM doctor_schedules s
+            LEFT JOIN appointments a 
+                ON s.schedule_id = a.schedule_id 
+               AND a.status != 'Cancelled'
+            WHERE s.doctor_id = ?
+              AND s.date >= CURDATE()
             GROUP BY s.schedule_id
             ORDER BY s.date ASC, s.start_time ASC
         `;
 
-        const [rows] = await pool.query(query, queryParams);
+        const [rows] = await pool.query(query, [req.operatingDoctorId]);
         res.json(rows);
+
     } catch (e) {
         console.error(e);
-        res.status(500).json({ message: 'Error fetching available slots' });
+        res.status(500).json({ message: 'Error fetching schedules' });
     }
 });
+
 
 
 // --- 5. BOOK A SERIAL (Transaction) ---
