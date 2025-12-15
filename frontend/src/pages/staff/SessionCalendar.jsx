@@ -9,6 +9,7 @@ function SessionCalendar() {
     const [sessions, setSessions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [doctorNameDisplay, setDoctorNameDisplay] = useState('');
+    const [viewHistory, setViewHistory] = useState(false);
     
     // Default Date to Today (Local Format YYYY-MM-DD)
     // new Date().toISOString() can sometimes be 'yesterday' if it's early morning locally.
@@ -25,24 +26,30 @@ function SessionCalendar() {
     });
 
     const fetchSessions = async () => {
-        try {
-            const res = await fetch(`${VITE_API_URL}/schedules/my-sessions`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setSessions(data);
-                
-                // Set the doctor name from the first result if available
+            setLoading(true);
+            try {
+                // Toggle URL query
+                const mode = viewHistory ? 'history' : 'current';
+                const limit = viewHistory ? 50 : 30;
+    
+                const res = await fetch(`${VITE_API_URL}/schedules/my-sessions?view=${mode}&limit=${limit}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setSessions(data);
+                    // ... doctor name logic
+                    // Set the doctor name from the first result if available
                 if (data.length > 0) {
                     setDoctorNameDisplay(data[0].doctor_name);
                 }
-            }
-        } catch (e) { /*...*/ } 
-        finally { setLoading(false); }
-    };
-
-    useEffect(() => { fetchSessions(); }, [token]);
+                }
+            } catch (e) { } 
+            finally { setLoading(false); }
+        };
+    
+        // Re-fetch when toggle changes
+        useEffect(() => { fetchSessions(); }, [token, viewHistory]);
 
     const handleCreate = async (e) => {
         e.preventDefault();
@@ -183,7 +190,19 @@ function SessionCalendar() {
 
                 {/* 2. CALENDAR LIST */}
                 <div className="lg:col-span-2">
-                    <h3 className="font-bold text-gray-700 mb-4">Active & Upcoming Sessions</h3>
+                    <div className="mb-6 flex justify-between items-end">
+                        <h3 className="text-xl font-bold text-gray-800">
+                            {viewHistory ? 'Past History (Last 50)' : 'Active & Upcoming Sessions'}
+                        </h3>
+                        
+                        {/* TOGGLE BUTTON */}
+                        <button 
+                            onClick={() => setViewHistory(!viewHistory)}
+                            className={`text-sm px-4 py-2 rounded-full border transition-all ${viewHistory ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                        >
+                            {viewHistory ? '← Show Active Sessions' : '📜 View Past History'}
+                        </button>
+                    </div>
                     
                     {loading ? <div className="p-8 text-center text-gray-400">Loading...</div> : 
                     

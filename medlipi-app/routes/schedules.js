@@ -32,27 +32,42 @@ router.use(verifyAnyUser);
 
 
 // --- 1. GET SESSIONS (Management View) ---
-// Returns schedules for the specific doctor (past & future)
+// --- 1. GET SESSIONS (Scalable View) ---
 router.get('/my-sessions', async (req, res) => {
-    // Only Doctor or Staff can see this management list
+    // Only Doctor or Staff
     if (req.user.role === 'patient') return res.status(403).json({ message: "Access denied" });
 
+    // Optional Query Params: limit, offset, view (upcoming vs history)
+    const limit = parseInt(req.query.limit) || 30; // Default 30 sessions
+    const view = req.query.view || 'current'; // 'current' or 'history'
+    
     try {
+        let dateCondition = '';
+        
+        // Show Today + Future by default. 'history' shows older.
+        if (view === 'current') {
+            dateCondition = `AND s.date >= DATE_SUB(CURDATE(), INTERVAL 1 DAY)`; // Show yesterday + future
+        } else if (view === 'history') {
+            dateCondition = `AND s.date < CURDATE()`;
+        }
+
         const query = `
             SELECT 
                 s.*, 
                 d.full_name as doctor_name, 
                 COUNT(a.appointment_id) as booked_count
             FROM doctor_schedules s
-            JOIN doctors d ON s.doctor_id = d.doctor_id -- <--- JOIN DOCTOR TABLE
+            JOIN doctors d ON s.doctor_id = d.doctor_id
             LEFT JOIN appointments a ON s.schedule_id = a.schedule_id AND a.status != 'Cancelled'
             WHERE s.doctor_id = ? 
+            ${dateCondition}
             GROUP BY s.schedule_id
             ORDER BY s.date DESC, s.start_time ASC
+            LIMIT ?
         `;
         
-        // Use the calculated Operating ID (Works for Doc & Receptionist)
-        const [rows] = await pool.query(query, [req.operatingDoctorId]);
+        // Use the calculated Operating ID
+        const [rows] = await pool.query(query, [req.operatingDoctorId, limit]);
         res.json(rows);
     } catch (e) {
         console.error(e);
