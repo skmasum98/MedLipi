@@ -28,10 +28,9 @@ router.get('/doctors', async (req, res) => {
 // --- GET Specific Doctor's Available Schedules ---
 router.get('/doctors/:id/schedules', async (req, res) => {
     const doctorId = req.params.id;
-    // Get "Today" in YYYY-MM-DD format from the Server's local time perspective
-    const today = new Date().toISOString().split('T')[0];
 
     try {
+        // Fetch ALL future/today sessions first
         const query = `
             SELECT 
                 s.*, 
@@ -39,12 +38,40 @@ router.get('/doctors/:id/schedules', async (req, res) => {
             FROM doctor_schedules s
             LEFT JOIN appointments a ON s.schedule_id = a.schedule_id AND a.status != 'Cancelled'
             WHERE s.doctor_id = ? 
-            AND s.date >= ? 
+            AND s.date >= CURDATE()
             GROUP BY s.schedule_id
             ORDER BY s.date ASC, s.start_time ASC
         `;
-        const [rows] = await pool.query(query, [doctorId, today]);
-        res.json(rows);
+        const [rows] = await pool.query(query, [doctorId]);
+
+        // --- FILTER IN JAVASCRIPT FOR ACCURATE TIME ---
+        const now = new Date();
+        // Server time -> BD Time (UTC+6) Approximation
+        const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+        const bdNow = new Date(utc + (3600000 * 6));
+        const bdDateStr = bdNow.toISOString().split('T')[0];
+
+        const validRows = rows.filter(s => {
+            const sDateStr = new Date(s.date).toISOString().split('T')[0];
+
+            if (sDateStr > bdDateStr) return true; // Future Date = Valid
+
+            if (sDateStr === bdDateStr) {
+                // It is TODAY. Check End Time.
+                const [endH, endM] = s.end_time.split(':').map(Number);
+                const curH = bdNow.getHours();
+                const curM = bdNow.getMinutes();
+
+                if (curH > endH || (curH === endH && curM >= endM)) {
+                    return false; // Time passed
+                }
+                return true; // Still active today
+            }
+            return false;
+        });
+        
+        res.json(validRows);
+
     } catch (e) {
         console.error(e);
         res.status(500).json({ message: 'Error fetching schedules' });

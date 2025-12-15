@@ -110,27 +110,79 @@ router.post('/create', async (req, res) => {
 // --- 4. PUBLIC: GET AVAILABLE SESSIONS (Used by Booking Modal) ---
 router.get('/available', async (req, res) => {
     try {
-        if (!req.operatingDoctorId) {
-            return res.status(403).json({ message: 'Doctor context missing' });
+        const { doctor_id } = req.query; // IMPORTANT for filtering by doctor
+        
+        // This is a safety check in case the client doesn't pass it, 
+        // but for walk-in usage, we default to the operating user's context.
+        const targetDoctorId = doctor_id || req.operatingDoctorId; 
+
+        if (!targetDoctorId) {
+             // If we don't know which doctor, we can't filter their schedules accurately
+             // But technically we could return nothing.
+             // Let's assume frontend passes doctor_id or we use logged-in user context.
+             return res.status(400).json({ message: "Doctor context required." });
         }
 
-        const query = `
+        // --- SQL TIME LOGIC EXPLAINED ---
+        // 1. Get Sessions for Doctor
+        // 2. Count Bookings
+        // 3. Filter:
+        //    (Date is in Future) 
+        //    OR 
+        //    (Date is TODAY AND End Time > Current Time in Bangladesh)
+        
+        // Note: IF your DB server is UTC, you might need DATE_ADD(NOW(), INTERVAL 6 HOUR)
+        // Assuming your node connection has dateStrings:true, let's use JS to filter strictly if needed, 
+        // OR rely on SQL if the server is configured.
+        
+        // Safer Hybrid Approach: Fetch "Today and Future", then filter "Expired Time" in JS loop.
+        
+        let query = `
             SELECT 
                 s.*, 
-                COUNT(a.appointment_id) AS booked_count
+                COUNT(a.appointment_id) as booked_count
             FROM doctor_schedules s
-            LEFT JOIN appointments a 
-                ON s.schedule_id = a.schedule_id 
-               AND a.status != 'Cancelled'
-            WHERE s.doctor_id = ?
-              AND s.date >= CURDATE()
+            LEFT JOIN appointments a ON s.schedule_id = a.schedule_id AND a.status != 'Cancelled'
+            WHERE s.doctor_id = ? 
+            AND s.date >= CURDATE() -- Get everything from today onwards
             GROUP BY s.schedule_id
             ORDER BY s.date ASC, s.start_time ASC
         `;
+        
+        const [rows] = await pool.query(query, [targetDoctorId]);
 
-        const [rows] = await pool.query(query, [req.operatingDoctorId]);
-        res.json(rows);
+        // --- POST-PROCESSING FILTER (Timezone Safe) ---
+        const now = new Date(); // Server local time (usually UTC or System Time)
+        // Adjust 'now' to BD Time if server is remote (e.g. Render)
+        // Render/AWS use UTC. BD is UTC+6.
+        const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+        const bdNow = new Date(utc + (3600000 * 6)); // Create strict BD Time Object
 
+        const validSessions = rows.filter(s => {
+            // Convert session date string '2025-12-14' to BD Time Date object
+            const sDate = new Date(s.date); // '2025-12-14T00:00:00'
+            const sDateStr = sDate.toISOString().split('T')[0];
+            const todayStr = bdNow.toISOString().split('T')[0];
+
+            if (sDateStr > todayStr) return true; // Future dates are always valid
+            
+            if (sDateStr === todayStr) {
+                // Same Day Check: Is End Time passed?
+                const [endH, endM] = s.end_time.split(':').map(Number);
+                const currentH = bdNow.getHours();
+                const currentM = bdNow.getMinutes();
+
+                // If (Current Hour > End Hour) OR (Same Hour AND Current Min > End Min) -> Expired
+                if (currentH > endH || (currentH === endH && currentM >= endM)) {
+                    return false; // Expired today
+                }
+                return true; // Still time left today
+            }
+
+            return false; // Past date (shouldn't happen due to SQL but good for safety)
+        });
+
+        res.json(validSessions);
     } catch (e) {
         console.error(e);
         res.status(500).json({ message: 'Error fetching schedules' });

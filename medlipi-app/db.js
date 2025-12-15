@@ -11,7 +11,9 @@ const pool = mysql.createPool({
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
-    charset: 'utf8mb4' 
+    charset: 'utf8mb4' ,
+    timezone: '+06:00', 
+    dateStrings: true,
 });
 
 console.log(`Attempting to connect to database: ${process.env.DB_DATABASE}`);

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router';
 import { useAuth } from '../hooks/useAuth';
 import { useDebounce } from '../hooks/useDebounce';
+import { getDhakaDateISO, formatDisplayDate, formatDisplayTime } from '../utils/dateUtils';
 
 const VITE_API_URL = import.meta.env.VITE_API_URL;
 
@@ -51,10 +52,10 @@ function WalkInEntry() {
                 if (res.ok) {
                     const data = await res.json();
                     const now = new Date();
-                    const todayStr = now.toISOString().split('T')[0];
-                    
+                    const todayStr = getDhakaDateISO();
+
                     const available = data.filter(s => {
-                        const sDate = s.date.split('T')[0];
+                        const sDate = s.date.slice(0, 10); // safer
                         return sDate >= todayStr && s.booked_count < s.max_patients;
                     });
 
@@ -367,6 +368,8 @@ function WalkInEntry() {
                                     const isFull = s.booked_count >= s.max_patients;
                                     const isSelected = selectedSessionId === s.schedule_id;
                                     const availableCount = s.max_patients - s.booked_count;
+                                    const prettyDate = formatDisplayDate(s.date);
+                                    const prettyTime = `${formatDisplayTime(s.start_time)} - ${formatDisplayTime(s.end_time)}`;
 
                                     return (
                                         <div
@@ -381,11 +384,11 @@ function WalkInEntry() {
                                             <div className="flex justify-between items-start">
                                                 <div>
                                                     <p className={`text-sm font-bold uppercase tracking-wide mb-1 ${isSelected ? 'text-indigo-700' : 'text-gray-500'}`}>
-                                                        {formatDatePretty(s.date)}
+                                                        {prettyDate}
                                                     </p>
                                                     <div className="flex items-center gap-2 text-gray-800 font-semibold text-lg">
                                                         <ClockIcon />
-                                                        {s.start_time.substring(0,5)} - {s.end_time.substring(0,5)}
+                                                        {prettyTime}
                                                     </div>
                                                 </div>
                                                 <div className="text-right">

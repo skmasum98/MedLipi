@@ -71,7 +71,7 @@ router.post('/', async (req, res) => {
     const doctorId = req.doctor.id; 
     
     // Generate Metadata
-    const batchDate = new Date(); 
+    const batchDate = formatInTimeZone(new Date(), 'Asia/Dhaka', 'yyyy-MM-dd HH:mm:ss');
     const publicUid = uuidv4(); 
 
     let connection;
