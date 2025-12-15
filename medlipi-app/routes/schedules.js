@@ -31,7 +31,7 @@ const verifyAnyUser = (req, res, next) => {
 router.use(verifyAnyUser);
 
 
-// --- 1. GET SESSIONS (Management View) ---
+
 // --- 1. GET SESSIONS (Scalable View) ---
 router.get('/my-sessions', async (req, res) => {
     // Only Doctor or Staff
