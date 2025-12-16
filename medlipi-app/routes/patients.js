@@ -2,6 +2,8 @@ import express from 'express';
 import pool from '../db.js';
 import verifyToken from '../middleware/auth.js'; 
 
+import { formatInTimeZone } from 'date-fns-tz'; 
+
 const router = express.Router();
 router.use(verifyToken); 
 
@@ -123,10 +125,12 @@ router.get('/:id/profile', async (req, res) => {
 
         // Grouping Logic
         const timeline = historyRows.reduce((acc, row) => {
-            const date = new Date(row.created_at).toLocaleDateString();
-            const time = new Date(row.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+           const dateObj = new Date(row.created_at);
+            
+            const date = dateObj.toLocaleDateString();
+            const time = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             // Use exact timestamp string for grouping to allow precision editing
-            const key = row.created_at.toISOString(); 
+            const key = row.created_at; 
             
             if (!acc[key]) {
                 acc[key] = {
