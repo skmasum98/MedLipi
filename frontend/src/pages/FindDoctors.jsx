@@ -11,7 +11,37 @@ function FindDoctors() {
     const [loading, setLoading] = useState(true);
     
     // Auth Check
-    const token = localStorage.getItem('patientToken');
+        const token = localStorage.getItem('patientToken');
+
+        useEffect(() => {
+            if (!token) {
+                navigate('/patient/login');
+                return;
+            }
+    
+            const fetchData = async () => {
+                try {
+                    // 1. Fetch History
+                    const histRes = await fetch(`${VITE_API_URL}/portal/my-history`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (histRes.ok) setHistory(await histRes.json());
+                    else {
+                        localStorage.removeItem('patientToken');
+                        navigate('/patient/login');
+                    }
+    
+                    // 2. Fetch Upcoming Status
+                     const apptRes = await fetch(`${VITE_API_URL}/portal/my-appointments`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (apptRes.ok) setMyAppointments(await apptRes.json());
+    
+                } catch (e) { console.error(e); } 
+                finally { setLoading(false); }
+            };
+            fetchData();
+        }, [token, navigate]);
 
     // 1. Load Doctors on Mount
     useEffect(() => {
