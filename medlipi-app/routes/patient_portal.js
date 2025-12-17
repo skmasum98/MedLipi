@@ -7,6 +7,7 @@ const router = express.Router();
 // --- 0. PATIENT REGISTRATION ---
 router.post('/register', async (req, res) => {
     const { name, mobile, age, gender, address } = req.body;
+    
 
     // 1. Basic Validation
     if (!name || !mobile || !gender) {
@@ -22,15 +23,26 @@ router.post('/register', async (req, res) => {
             return res.status(409).json({ message: 'This mobile number is already registered. Please login.' });
         }
 
+
+        let dob = null;
+        if (age) {
+            // Assume age is in Years for quick registration
+            const years = parseInt(age);
+            if (!isNaN(years)) {
+                const date = new Date();
+                date.setFullYear(date.getFullYear() - years);
+                dob = date.toISOString().split('T')[0];
+            }
+        }
         // 3. Insert New Patient
         // We use "0" as doctor_id or handle it logically. In your schema, patients table doesn't enforce doctor_id, 
         // prescriptions map patients to doctors. So a patient can exist independently.
         const query = `
-            INSERT INTO patients (name, mobile, age, gender, address, created_at) 
-            VALUES (?, ?, ?, ?, ?, NOW())
+            INSERT INTO patients (name, mobile, age, gender, address, dob, created_at) 
+            VALUES (?, ?, ?, ?, ?, ?, NOW())
         `;
         
-        const [result] = await pool.query(query, [name, mobile, age, gender, address]);
+        const [result] = await pool.query(query, [name, mobile, age, gender, address, dob]);
         const newPatientId = result.insertId;
 
         // 4. Generate Token (Auto-Login)

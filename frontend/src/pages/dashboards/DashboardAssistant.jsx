@@ -22,7 +22,7 @@ function DashboardAssistant() {
 
     const handleStartPrep = (patient) => {
         // Navigate to Prescription Form in "Prep Mode"
-        navigate('/prescription/new', { state: { patientData: patient, queueMode: true, isAssistant: true } });
+        navigate('/assistant/vitals', { state: { patientData: patient, queueMode: true, isAssistant: true } });
     };
 
     return (

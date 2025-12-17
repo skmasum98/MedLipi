@@ -7,38 +7,34 @@ import { formatInTimeZone } from 'date-fns-tz';
 const router = express.Router();
 router.use(verifyToken); 
 
+// Helper function to get correct doctor ID
+const getOperatingDoctorId = (req) => {
+    return (req.user.role === 'doctor') ? req.user.id : req.user.parentId;
+};
 
 
 // --- GET All Patients (Search + Filter + Pagination) ---
 router.get('/', async (req, res) => {
-    const { 
-        q, page = 1, limit = 10, 
-        gender, address, diagnosis, 
-        startDate, endDate //
-    } = req.query;
+    const { q, page = 1, limit = 10, gender, address, diagnosis, startDate, endDate } = req.query;
 
     const offset = (page - 1) * limit;
-   const doctorId = (req.user.role === 'doctor') 
-        ? req.user.id 
-        : req.user.parentId;
+    const doctorId = getOperatingDoctorId(req);
 
     if (!doctorId) return res.status(403).json({ message: "No doctor association found" });
+    
     const searchTerm = q ? `%${q}%` : '%';
 
     try {
-        // Base Query Logic
         let whereClause = `
             WHERE pr.doctor_id = ? 
             AND (p.name LIKE ? OR p.mobile LIKE ?)
         `;
         const params = [doctorId, searchTerm, searchTerm];
 
-        // --- DYNAMIC FILTERS ---
         if (gender) { whereClause += ` AND p.gender = ?`; params.push(gender); }
         if (address) { whereClause += ` AND p.address LIKE ?`; params.push(`%${address}%`); }
         if (diagnosis) { whereClause += ` AND pr.diagnosis_text LIKE ?`; params.push(`%${diagnosis}%`); }
         
-        // --- DATE FILTERS (NEW) ---
         if (startDate) { 
             whereClause += ` AND DATE(pr.created_at) >= ?`; 
             params.push(startDate); 
@@ -48,7 +44,6 @@ router.get('/', async (req, res) => {
             params.push(endDate); 
         }
 
-        // --- 1. DATA QUERY ---
         const sql = `
             SELECT 
                 p.patient_id, p.name, p.age, p.gender, p.mobile, p.address,
@@ -61,7 +56,6 @@ router.get('/', async (req, res) => {
             LIMIT ? OFFSET ?
         `;
         
-        // --- 2. COUNT QUERY ---
         const countSql = `
             SELECT COUNT(DISTINCT p.patient_id) as total
             FROM patients p
@@ -69,12 +63,9 @@ router.get('/', async (req, res) => {
             ${whereClause}
         `;
 
-        // Add limit/offset to params ONLY for the data query
         const dataParams = [...params, parseInt(limit), parseInt(offset)];
-        const countParams = [...params];
-
         const [patients] = await pool.query(sql, dataParams);
-        const [countResult] = await pool.query(countSql, countParams);
+        const [countResult] = await pool.query(countSql, params);
 
         res.json({
             data: patients,
@@ -92,22 +83,16 @@ router.get('/', async (req, res) => {
     }
 });
 
-// --- GET Single Patient Full Profile (Timeline & Edit Data) ---
+// --- GET Single Patient Full Profile ---
 router.get('/:id/profile', async (req, res) => {
     const patientId = req.params.id;
-    const doctorId = req.doctor.id;
+    // FIX: Use Helper
+    const doctorId = getOperatingDoctorId(req); 
 
     try {
-        // 1. Patient Demographics
-        const [patientRows] = await pool.query(
-            'SELECT * FROM patients WHERE patient_id = ?', 
-            [patientId]
-        );
-        
+        const [patientRows] = await pool.query('SELECT * FROM patients WHERE patient_id = ?', [patientId]);
         if (patientRows.length === 0) return res.status(404).json({ message: 'Patient not found' });
 
-        // 2. Visit History (Grouped)
-        // FIX: Added all the clinical fields (chief_complaint, etc.) to the SELECT
         const historyQuery = `
             SELECT 
                 pr.prescription_id, pr.created_at, 
@@ -123,22 +108,20 @@ router.get('/:id/profile', async (req, res) => {
         `;
         const [historyRows] = await pool.query(historyQuery, [patientId, doctorId]);
 
-        // Grouping Logic
         const timeline = historyRows.reduce((acc, row) => {
-           const dateObj = new Date(row.created_at);
-            
+            // Safe Date Formatting
+            const dateObj = new Date(row.created_at);
             const date = dateObj.toLocaleDateString();
             const time = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            // Use exact timestamp string for grouping to allow precision editing
-            const key = row.created_at; 
+            
+            const key = row.created_at; // Raw string
             
             if (!acc[key]) {
                 acc[key] = {
                     date, time,
-                    raw_date: row.created_at, // Critical for Edit/Update identification
+                    raw_date: row.created_at, 
                     diagnosis: row.diagnosis_text,
                     advice: row.general_advice,
-                    // Map new clinical fields so they appear in Edit Form
                     chief_complaint: row.chief_complaint,
                     medical_history: row.medical_history,
                     examination_findings: row.examination_findings,
@@ -147,7 +130,6 @@ router.get('/:id/profile', async (req, res) => {
                     drugs: []
                 };
             }
-            // Only add drug if it exists (in case of manual row insertion errors)
             if (row.drug_id) {
                 acc[key].drugs.push({
                     drug_id: row.drug_id,
@@ -174,14 +156,13 @@ router.get('/:id/profile', async (req, res) => {
     }
 });
 
-// --- GET Search Patients ---
+// --- GET Search Patients (Mini Search) ---
 router.get('/search', async (req, res) => {
     const searchTerm = req.query.q ? `%${req.query.q}%` : '';
-    const doctorId = req.doctor.id;
+    // FIX: Use Helper
+    const doctorId = getOperatingDoctorId(req);
     
-    if (!searchTerm) {
-        return res.status(400).json({ message: 'Search term (q) is required.' });
-    }
+    if (!searchTerm) return res.status(400).json({ message: 'Search term (q) is required.' });
 
     try {
         const query = `
@@ -193,9 +174,7 @@ router.get('/search', async (req, res) => {
             WHERE pr.doctor_id = ? AND (p.name LIKE ? OR p.mobile LIKE ?)
             LIMIT 20
         `;
-        
         const [patients] = await pool.query(query, [doctorId, searchTerm, searchTerm]);
-        
         res.json(patients);
     } catch (error) {
         console.error('Error searching patients:', error);
@@ -203,10 +182,11 @@ router.get('/search', async (req, res) => {
     }
 });
 
-// --- GET Mini History (For Prescription Form) ---
+// --- GET Mini History ---
 router.get('/:patientId/history', async (req, res) => {
     const patientId = req.params.patientId;
-    const doctorId = req.doctor.id;
+    // FIX: Use Helper
+    const doctorId = getOperatingDoctorId(req);
 
     try {
         const query = `
@@ -219,20 +199,22 @@ router.get('/:patientId/history', async (req, res) => {
             WHERE pr.patient_id = ? AND pr.doctor_id = ?
             ORDER BY pr.created_at DESC;
         `;
-        
         const [history] = await pool.query(query, [patientId, doctorId]);
 
         const groupedHistory = history.reduce((acc, item) => {
-            const date = new Date(item.created_at).toLocaleDateString();
-            if (!acc[date]) {
-                acc[date] = {
+            const dateObj = new Date(item.created_at);
+            const date = dateObj.toLocaleDateString();
+            const key = item.created_at;
+
+            if (!acc[key]) {
+                acc[key] = {
                     date: date,
                     diagnosis: item.diagnosis_text,
                     advice: item.general_advice,
                     prescriptions: []
                 };
             }
-            acc[date].prescriptions.push({
+            acc[key].prescriptions.push({
                 drug_id: item.drug_id,
                 generic_name: item.generic_name,
                 trade_names: item.trade_names,

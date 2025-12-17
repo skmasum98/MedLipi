@@ -263,7 +263,7 @@ router.post('/book-serial', async (req, res) => {
             `INSERT INTO appointments 
             (doctor_id, patient_id, schedule_id, visit_date, serial_number, source, status, reason)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [session.doctor_id, actualPatientId, schedule_id, session.date, nextSerial, source, status, 'Standard Appointment']
+            [session.doctor_id, actualPatientId, schedule_id, session.date, nextSerial, source, status, '']
         );
 
         await connection.commit();

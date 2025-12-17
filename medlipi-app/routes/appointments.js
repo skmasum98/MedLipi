@@ -40,6 +40,7 @@ router.get('/', async (req, res) => {
         let query = `
             SELECT 
                 a.*, 
+                a.prep_bp, a.prep_weight, a.prep_pulse, a.prep_temp, a.prep_cc, a.prep_notes,
                 p.name as patient_name, 
                 p.mobile, 
                 p.age, 
@@ -158,5 +159,28 @@ router.delete('/:id', async (req, res) => {
         res.status(500).json({ message: 'Delete failed' });
     }
 });
+
+// --- PUT Save Assistant Prep Data ---
+router.put('/:id/prep', async (req, res) => {
+    const { id } = req.params;
+    const { bp, weight, pulse, temp, chief_complaint, notes } = req.body;
+    
+    // Only Doctor, Assistant, or Receptionist should hit this
+    if (req.user.role === 'patient') return res.status(403).json({ message: "Unauthorized" });
+
+    try {
+        await pool.query(
+            `UPDATE appointments 
+             SET prep_bp=?, prep_weight=?, prep_pulse=?, prep_temp=?, prep_cc=?, prep_notes=?, status='Ready'
+             WHERE appointment_id=?`,
+            [bp, weight, pulse, temp, chief_complaint, notes, id]
+        );
+        res.json({ message: 'Patient preparation saved. Marked as Ready.' });
+    } catch (e) { 
+        console.error(e);
+        res.status(500).json({ message: 'Error saving prep data' }); 
+    }
+});
+
 
 export default router;
