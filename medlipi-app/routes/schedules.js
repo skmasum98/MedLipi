@@ -278,4 +278,69 @@ router.post('/book-serial', async (req, res) => {
     }
 });
 
+
+// --- GLOBAL RECEPTION: MANAGE specific doctor ---
+router.get('/global/manage-sessions/:target_id', async (req, res) => {
+    // Only Global Receptionist
+    if (req.user.role !== 'global_receptionist') return res.status(403).json({ message: 'Forbidden' });
+    
+    // Returns sessions exactly like the doctor sees them
+    try {
+        const query = `
+            SELECT s.*, COUNT(a.appointment_id) as booked_count 
+            FROM doctor_schedules s
+            LEFT JOIN appointments a ON s.schedule_id = a.schedule_id AND a.status != 'Cancelled'
+            WHERE s.doctor_id = ?
+            GROUP BY s.schedule_id ORDER BY s.date DESC
+        `;
+        const [rows] = await pool.query(query, [req.params.target_id]);
+        res.json(rows);
+    } catch(e) { res.status(500).json({message:'Error'}); }
+});
+
+// --- GLOBAL RECEPTION: CREATE for target ---
+router.post('/global/create', async (req, res) => {
+    if (req.user.role !== 'global_receptionist') return res.status(403).json({ message: 'Forbidden' });
+
+    const { target_doctor_id, date, session_name, start_time, end_time, max_patients } = req.body;
+    
+    try {
+        await pool.query(
+            `INSERT INTO doctor_schedules (doctor_id, date, session_name, start_time, end_time, max_patients) VALUES (?,?,?,?,?,?)`,
+            [target_doctor_id, date, session_name, start_time, end_time, max_patients]
+        );
+        res.status(201).json({message: 'Success'});
+    } catch(e) { res.status(500).json({message:'Error'}); }
+});
+
+// --- GLOBAL RECEPTION: DELETE ---
+router.delete('/global/:id', async (req, res) => {
+    if (req.user.role !== 'global_receptionist') return res.status(403).json({ message: 'Forbidden' });
+    
+    try {
+        // Warning: This ignores user ownership because Global can manage anyone
+        await pool.query('DELETE FROM doctor_schedules WHERE schedule_id = ?', [req.params.id]);
+        res.json({message: 'Deleted'});
+    } catch(e) { res.status(500).json({message: 'Delete failed'}); }
+});
+
+// --- GET PATIENTS FOR SESSION (Global) ---
+router.get('/global/:id/bookings', async (req, res) => {
+    // Check permission
+    if (req.user.role !== 'global_receptionist' && req.user.role !== 'doctor') return res.status(403).json({message: "No"});
+
+    try {
+        const [rows] = await pool.query(`
+            SELECT a.appointment_id, a.serial_number, p.name as patient_name, p.mobile, a.status 
+            FROM appointments a 
+            JOIN patients p ON a.patient_id = p.patient_id 
+            WHERE a.schedule_id = ? AND a.status != 'Cancelled'
+            ORDER BY a.serial_number ASC
+        `, [req.params.id]);
+        res.json(rows);
+    } catch(e) { res.status(500).json({message:"Error"}); }
+});
+
+
+
 export default router;

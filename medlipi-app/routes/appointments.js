@@ -26,15 +26,23 @@ router.use(verifyAnyUser);
 
 // --- GET Appointments (Doctor OR Staff View) ---
 router.get('/', async (req, res) => {
-    const { date, type } = req.query; // type='upcoming'
+    const { date, type, schedule_id } = req.query; 
 
-    // FIX 1: Allow Receptionists and Assistants to see the schedule too!
-    if (req.user.role === 'patient') {
+    // 1. Permission Check
+    // If Global Receptionist: Skip doctorId check (they view all via schedule_id or doctor_id param)
+    // If Staff/Doctor: Must be restricted to their clinic
+    
+    // We assume 'req.operatingDoctorId' is set for standard staff.
+    // If Global Receptionist, 'req.operatingDoctorId' might be undefined or irrelevant if schedule_id is passed.
+    
+    let doctorId = req.operatingDoctorId;
+
+    if (req.user.role === 'global_receptionist' && schedule_id) {
+         // Allow bypass for specific schedule
+         doctorId = null; 
+    } else if (req.user.role === 'patient') {
          return res.status(403).json({ message: 'Access denied for patients.' });
     }
-
-    // Use the derived Doctor ID (Doctor's Own ID or Staff's Boss ID)
-    const doctorId = req.operatingDoctorId; 
 
     try {
         let query = `
@@ -53,23 +61,40 @@ router.get('/', async (req, res) => {
             FROM appointments a
             JOIN patients p ON a.patient_id = p.patient_id
             LEFT JOIN doctor_schedules ds ON a.schedule_id = ds.schedule_id
-            WHERE a.doctor_id = ?
+            WHERE 1=1
         `;
         
-        const params = [doctorId];
+        const params = [];
 
+        // 2. Doctor Filter (Apply unless Global & Schedule ID present)
+        if (doctorId) {
+            query += ` AND a.doctor_id = ?`;
+            params.push(doctorId);
+        }
+
+        // 3. Schedule Filter (Priority)
+        if (schedule_id) {
+            query += ` AND a.schedule_id = ? ORDER BY a.serial_number ASC`;
+            params.push(schedule_id);
+            // Return early if fetching for specific schedule list
+            const [rows] = await pool.query(query, params);
+            return res.json(rows);
+        }
+
+        // 4. Date Filter (If not Schedule filtered)
         if (type === 'upcoming') {
             query += ` AND a.visit_date >= CURDATE() ORDER BY a.visit_date ASC, a.visit_time ASC LIMIT 50`;
         } else if (date) {
             query += ` AND a.visit_date = ? ORDER BY a.visit_time ASC`;
             params.push(date);
         } else {
-             // Default: Today
+             // Default
              query += ` AND a.visit_date = CURDATE() ORDER BY a.visit_time ASC`;
         }
 
         const [rows] = await pool.query(query, params);
         res.json(rows);
+
     } catch (error) {
         console.error("GET Appointment Error:", error);
         res.status(500).json({ message: 'Server error' });

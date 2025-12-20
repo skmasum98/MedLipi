@@ -19,6 +19,15 @@ const verifyToken = (req, res, next) => {
         // This is the new standard: use req.user.id, req.user.role everywhere eventually
         req.user = decoded; 
 
+        // GLOBAL RECEPTIONIST LOGIC:
+        // They pass 'target_doctor_id' in headers (x-target-doctor-id) or query when doing specific actions.
+        if (decoded.role === 'global_receptionist') {
+            const headerId = req.headers['x-target-doctor-id'];
+            if (headerId) {
+                req.operatingDoctorId = parseInt(headerId); // Impersonate this doctor
+            }
+        }
+
         // 4. BACKWARD COMPATIBILITY
         // If the token belongs to a DOCTOR, attach it to req.doctor as well
         // so your older routes (e.g. GET /prescriptions/recent) don't crash.

@@ -39,6 +39,11 @@ import StaffLogin from './pages/staff/StaffLogin';
 import SessionCalendar from './pages/staff/SessionCalendar';
 import WalkInEntry from './pages/WalkInEntry';
 import ReceptionAppointments from './pages/staff/ReceptionAppointments';
+import DashboardGlobalReception from './pages/dashboards/DashboardGlobalReception';
+import GlobalReceptionLayout from './layouts/GlobalReceptionLayout';
+import GlobalStaffLogin from './pages/global_reception/GlobalStaffLogin';
+import GlobalSessionManager from './pages/global_reception/GlobalSessionManager';
+import GlobalWalkIn from './pages/global_reception/GlobalWalkIn';
 
 
 function App() {
@@ -93,6 +98,18 @@ function App() {
                     {/* === 5. ADMIN ROUTES (Standalone) === */}
                     <Route path="/admin/login" element={<AdminLogin />} />
                     <Route path="/admin/dashboard" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+                    
+
+                    {/* GLOBAL STAFF LOGIN ROUTE */}
+                    <Route path="/global/login" element={<GlobalStaffLogin />} />
+                    <Route element={<ProtectedRoute allowedRoles={['global_receptionist']}><GlobalReceptionLayout /></ProtectedRoute>}>
+                        <Route path="/greception-dashboard" element={<DashboardGlobalReception />} />
+                         <Route path="/greception/sessions" element={<GlobalSessionManager />} />
+                        <Route path="/greception/walk-in" element={<GlobalWalkIn />} />
+                        <Route path="/greception/schedule" element={<Appointments />} />
+                    </Route>
+
+
 
                     {/* === 6. NO LAYOUT ROUTES === */}
                     <Route path="/p/:uid" element={<PublicDownload />} /> 

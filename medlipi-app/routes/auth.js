@@ -56,6 +56,13 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ message: 'Invalid credentials.' });
         }
 
+        // Block suspended doctors immediately
+        if (doctor.status === 'suspended') {
+            return res.status(403).json({ 
+                message: "Access Denied: Your account has been suspended by the administrator. Contact Support." 
+            });
+        }
+
         // 2. Compare the provided password with the stored hash
         const isMatch = await bcrypt.compare(password, doctor.password_hash);
 
@@ -188,6 +195,30 @@ router.get('/me', (req, res) => {
     } catch (e) {
         return res.status(403).json({ message: 'Invalid token' });
     }
+});
+
+
+
+// --- GLOBAL STAFF LOGIN ---
+router.post('/global-staff/login', async (req, res) => {
+    const { username, password } = req.body;
+    try {
+        const [rows] = await pool.query('SELECT * FROM global_staff WHERE username = ?', [username]);
+        if (rows.length === 0) return res.status(401).json({ message: 'User not found' });
+        
+        const staff = rows[0];
+        if (staff.status === 'suspended') return res.status(403).json({ message: 'Account suspended' });
+
+        const isMatch = await bcrypt.compare(password, staff.password_hash);
+        if (!isMatch) return res.status(401).json({ message: 'Invalid credentials' });
+
+        const token = jwt.sign(
+            { id: staff.staff_id, role: staff.role, name: staff.full_name }, 
+            process.env.JWT_SECRET, 
+            { expiresIn: '12h' }
+        );
+        res.json({ token, user: { name: staff.full_name, role: staff.role } });
+    } catch (e) { res.status(500).json({ message: 'Error' }); }
 });
 
 // --- TEMP ADMIN REGISTRATION (Use Postman) ---

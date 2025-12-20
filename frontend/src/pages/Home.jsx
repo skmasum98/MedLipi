@@ -73,6 +73,7 @@ function Home() {
                     </div>
                     <div className="flex gap-6 text-gray-500 text-sm">
                         <Link to="/admin/login" className="hover:text-indigo-600">Admin Login</Link>
+                         <Link to="/global/login" className="hover:text-indigo-600">Frontdesk Login</Link>
                         <a href="#" className="hover:text-indigo-600">Privacy Policy</a>
                         <a href="#" className="hover:text-indigo-600">GitHub</a>
                     </div>
