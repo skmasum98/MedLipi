@@ -17,3 +17,16 @@
 .recharts-surface {
   min-width: 0 !important;
 }
+
+
+/* Ensure proper mobile viewport */
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Improve scrolling on mobile */
+  body {
+    overflow-x: hidden;
+  }
+}

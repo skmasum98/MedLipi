@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router';
-import { useAuth } from '../hooks/useAuth';
-import { useDebounce } from '../hooks/useDebounce';
-import { getDhakaDateISO, formatDisplayDate, formatDisplayTime } from '../utils/dateUtils';
+import { useAuth } from '../../hooks/useAuth';
+import { useDebounce } from '../../hooks/useDebounce';
+import { getDhakaDateISO, formatDisplayDate, formatDisplayTime } from '../../utils/dateUtils';
 
 const VITE_API_URL = import.meta.env.VITE_API_URL;
 
@@ -231,7 +231,7 @@ function WalkInEntryGlobal({ forceDoctorId = null }) {
                         <span className="bg-indigo-600 text-white p-2 rounded-lg"><UserIcon /></span>
                         Walk-in Entry
                     </h1>
-                    <Link to="/reception-dashboard" className="text-gray-500 hover:text-gray-900 font-medium text-sm">Cancel</Link>
+                    <Link to="/greception-dashboard" className="text-gray-500 hover:text-gray-900 font-medium text-sm">Cancel</Link>
                 </div>
 
                 {/* === LEFT COLUMN: PATIENT === */}

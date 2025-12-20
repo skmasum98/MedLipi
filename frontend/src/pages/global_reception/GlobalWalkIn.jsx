@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 import { useAuth } from '../../hooks/useAuth';
-import WalkInEntryGlobal from '../WalkInEntryGlobal';
+import WalkInEntryGlobal from './WalkInEntryGlobal';
 
 const VITE_API_URL = import.meta.env.VITE_API_URL;
 

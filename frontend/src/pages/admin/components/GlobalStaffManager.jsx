@@ -36,31 +36,39 @@ const GlobalStaffManager = ({ token }) => {
     };
 
     return (
-        <div className="space-y-6 animate-fade-in">
-            <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-white">Global Reception Team</h2>
-                <button onClick={() => setIsCreateOpen(true)} className="bg-green-600 text-white px-5 py-2 rounded-lg font-bold shadow hover:bg-green-500">
+        <div className="space-y-4 md:space-y-6 animate-fade-in p-3 md:p-0">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0">
+                <h2 className="text-xl sm:text-2xl font-bold text-white">Global Reception Team</h2>
+                <button onClick={() => setIsCreateOpen(true)} className="bg-green-600 text-white px-4 py-2 sm:px-5 sm:py-2 rounded-lg font-bold shadow hover:bg-green-500 w-full sm:w-auto">
                     + Add New Staff
                 </button>
             </div>
 
-            <div className="bg-gray-800 rounded-xl overflow-hidden border border-gray-700">
-                <table className="w-full text-left">
+            <div className="bg-gray-800 rounded-xl overflow-hidden border border-gray-700 overflow-x-auto">
+                <table className="w-full text-left min-w-[640px] md:min-w-full">
                     <thead className="bg-gray-700/50 text-xs uppercase text-gray-400">
                         <tr>
-                            <th className="p-4">Name</th>
-                            <th className="p-4">Username</th>
-                            <th className="p-4">Status</th>
-                            <th className="p-4 text-right">Actions</th>
+                            <th className="p-3 md:p-4">Name</th>
+                            <th className="p-3 md:p-4">Username</th>
+                            <th className="p-3 md:p-4">Status</th>
+                            <th className="p-3 md:p-4 text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-700 text-sm text-gray-200">
                         {staff.map(s => (
                             <tr key={s.staff_id}>
-                                <td className="p-4 font-bold">{s.full_name}</td>
-                                <td className="p-4 font-mono">{s.username}</td>
-                                <td className="p-4"><span className="bg-green-900 text-green-300 px-2 py-1 rounded text-xs uppercase">{s.status}</span></td>
-                                <td className="p-4 text-right"><button onClick={() => handleDelete(s.staff_id)} className="text-red-400 hover:text-white">Delete</button></td>
+                                <td className="p-3 md:p-4 font-bold truncate max-w-[150px] md:max-w-none">{s.full_name}</td>
+                                <td className="p-3 md:p-4 font-mono truncate max-w-[120px] md:max-w-none">{s.username}</td>
+                                <td className="p-3 md:p-4">
+                                    <span className="bg-green-900 text-green-300 px-2 py-1 rounded text-xs uppercase whitespace-nowrap">
+                                        {s.status}
+                                    </span>
+                                </td>
+                                <td className="p-3 md:p-4 text-right">
+                                    <button onClick={() => handleDelete(s.staff_id)} className="text-red-400 hover:text-white whitespace-nowrap">
+                                        Delete
+                                    </button>
+                                </td>
                             </tr>
                         ))}
                     </tbody>

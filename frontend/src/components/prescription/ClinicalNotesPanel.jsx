@@ -103,7 +103,7 @@ function ClinicalNotesPanel({
                     onClick={handleGenerateAI}
                     disabled={isGenerating}
                     className={`flex items-center gap-1 px-3 py-1 text-xs font-bold text-white rounded-md shadow transition-all
-                        ${isGenerating ? 'bg-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700'}
+                        ${isGenerating ? 'bg-gray-400 cursor-not-allowed' : 'bg-linear-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700'}
                     `}
                 >
                     {isGenerating ? (
