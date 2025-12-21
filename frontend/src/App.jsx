@@ -82,7 +82,7 @@ function App() {
                     <Route path='staff/login' element={<StaffLogin />} />
                     <Route element={<ProtectedRoute allowedRoles={['receptionist']}><ReceptionLayout /></ProtectedRoute>}>
                         <Route path="/reception-dashboard" element={<DashboardReception />} />
-                        <Route path="/reception/schedule" element={<ReceptionAppointments />} /> {/* Shared Component */}
+                        <Route path="/reception/schedule" element={<ReceptionAppointments />} /> 
                         <Route path="/reception/patients" element={<Patients />} /> {/* Shared Component */}
                         <Route path="/reception/sessions" element={<SessionCalendar />} />
                         <Route path="/reception/walk-in" element={<WalkInEntry />} /> 
