@@ -30,3 +30,31 @@
     overflow-x: hidden;
   }
 }
+
+/* Print styles for the appointment schedule */
+@media print {
+    /* Hide everything by default */
+    body * {
+        visibility: hidden;
+    }
+    
+    /* Show only the printable area */
+    #printable-schedule, #printable-schedule * {
+        visibility: visible;
+    }
+
+    #printable-schedule {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 20px;
+    }
+    
+    /* Remove browser headers/footers usually, or just ensure white background */
+    @page {
+        size: auto;
+        margin: 5mm;
+    }
+}
