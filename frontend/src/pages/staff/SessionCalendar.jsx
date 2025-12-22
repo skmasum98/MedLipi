@@ -135,7 +135,7 @@ function SessionCalendar() {
                         </span> 
                     </div>
                 </div>
-                <Link to="/appointments" className="px-4 py-2 border rounded-md text-gray-600 hover:bg-gray-50 font-medium">
+                <Link to="/reception/schedule" className="px-4 py-2 border rounded-md text-gray-600 hover:bg-gray-50 font-medium">
                     &larr; View Appointment List
                 </Link>
             </div>
