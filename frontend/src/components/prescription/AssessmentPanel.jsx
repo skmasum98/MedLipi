@@ -35,6 +35,8 @@ function AssessmentPanel({
                  <div className="flex flex-col gap-4">
                     <div className="relative z-30">
                         <SmartTextarea
+                            id="chief-complaint"
+                            name="chief-complaint"
                             label="Presenting Complaint (C/C)"
                             category="cc"
                             placeholder="e.g. Fever for 3 days..."
