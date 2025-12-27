@@ -277,7 +277,7 @@ function PrescriptionForm() {
         setPatientSearchQuery(q);
         if (q.length < 3) return setPatientSearchResults([]);
         try {
-            const res = await fetch(`${VITE_API_URL}/patients/search?q=${q}`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+            const res = await fetch(`${VITE_API_URL}/patients/search-patient?q=${q}`, { headers: { 'Authorization': `Bearer ${authToken}` } });
             if (res.ok) setPatientSearchResults(await res.json());
         } catch (e) {}
     };
@@ -372,6 +372,7 @@ function PrescriptionForm() {
 
         const diagStr = diagnosesList.map((d, i) => `${i+1}. ${d.description} (${d.code})`).join('\n');
         
+        
         const payload = {
             original_date: originalDate,
             patient: { ...patient, id: patient.id, age: ageStr },
@@ -396,7 +397,7 @@ function PrescriptionForm() {
                 
                 // Close appointment loop
                 if (linkedAppointmentId) {
-                     fetch(`${VITE_API_URL}/appointments/${linkedAppointmentId}/status`, {
+                     await fetch(`${VITE_API_URL}/appointments/${linkedAppointmentId}/status`, {
                         method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` }, body: JSON.stringify({ status: 'Completed' })
                     });
                 }

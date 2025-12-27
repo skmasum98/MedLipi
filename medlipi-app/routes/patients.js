@@ -241,30 +241,30 @@ router.get('/search', async (req, res) => {
 
 
 // --- GET Search Patients (Mini Search) ---
-// router.get('/search', async (req, res) => {
-//     const searchTerm = req.query.q ? `%${req.query.q}%` : '';
-//     // FIX: Use Helper
-//     const doctorId = getOperatingDoctorId(req);
+router.get('/search-patient', async (req, res) => {
+    const searchTerm = req.query.q ? `%${req.query.q}%` : '';
+    // FIX: Use Helper
+    const doctorId = getOperatingDoctorId(req);
     
-//     if (!searchTerm) return res.status(400).json({ message: 'Search term (q) is required.' });
+    if (!searchTerm) return res.status(400).json({ message: 'Search term (q) is required.' });
 
-//     try {
-//         const query = `
-//             SELECT DISTINCT 
-//                 p.patient_id, p.name, p.age, p.gender, 
-//                 p.dob, p.mobile, p.email, p.address, p.referred_by 
-//             FROM patients p
-//             JOIN prescriptions pr ON p.patient_id = pr.patient_id
-//             WHERE pr.doctor_id = ? AND (p.name LIKE ? OR p.mobile LIKE ?)
-//             LIMIT 20
-//         `;
-//         const [patients] = await pool.query(query, [doctorId, searchTerm, searchTerm]);
-//         res.json(patients);
-//     } catch (error) {
-//         console.error('Error searching patients:', error);
-//         res.status(500).json({ message: 'Server error during patient search.' });
-//     }
-// });
+    try {
+        const query = `
+            SELECT DISTINCT 
+                p.patient_id, p.name, p.age, p.gender, 
+                p.dob, p.mobile, p.email, p.address, p.referred_by 
+            FROM patients p
+            JOIN prescriptions pr ON p.patient_id = pr.patient_id
+            WHERE pr.doctor_id = ? AND (p.name LIKE ? OR p.mobile LIKE ?)
+            LIMIT 20
+        `;
+        const [patients] = await pool.query(query, [doctorId, searchTerm, searchTerm]);
+        res.json(patients);
+    } catch (error) {
+        console.error('Error searching patients:', error);
+        res.status(500).json({ message: 'Server error during patient search.' });
+    }
+});
 
 // --- GET Mini History ---
 router.get('/:patientId/history', async (req, res) => {
