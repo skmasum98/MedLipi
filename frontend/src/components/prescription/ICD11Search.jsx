@@ -115,12 +115,14 @@ export default function ICD11Search({ onSelect }) {
 
     return (
         <div className="relative w-full">
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
+            <label htmlFor="icd11" className="block text-sm font-semibold text-gray-700 mb-1">
                 Add Provisional Diagnosis (ICD-11)
             </label>
 
             <div className="relative">
                 <input
+                    id="icd11"
+                    name="icd11"
                     type="text"
                     className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 pr-10"
                     placeholder="Type to search..."
