@@ -66,12 +66,12 @@ function AssessmentPanel({
                         </label>
 
                         <div className="grid grid-cols-2 gap-3">
-                            <input type="text" name="bp" value={exam.bp} onChange={handleExamChange} className="w-full p-1 border rounded bg-white" placeholder="120/80" />
-                            <input type="text" name="pulse" value={exam.pulse} onChange={handleExamChange} className="w-full p-1 border rounded bg-white" placeholder="72" />
-                            <input type="text" name="temp" value={exam.temp} onChange={handleExamChange} className="w-full p-1 border rounded bg-white" placeholder="98.6" />
-                            <input type="text" name="weight" value={exam.weight} onChange={handleExamChange} className="w-full p-1 border rounded bg-white" placeholder="65" />
-                            <input type="text" name="spo2" value={exam.spo2} onChange={handleExamChange} className="w-full p-1 border rounded bg-white" placeholder="98" />
-                            <input type="text" name="bmi" value={exam.bmi} onChange={handleExamChange} className="w-full p-1 border rounded bg-white" placeholder="22.5" />
+                            <input type="text" name="bp" value={exam.bp} onChange={handleExamChange} className="w-full p-1 border rounded bg-white" placeholder="BP 120/80" />
+                            <input type="text" name="pulse" value={exam.pulse} onChange={handleExamChange} className="w-full p-1 border rounded bg-white" placeholder="Pulse 72" />
+                            <input type="text" name="temp" value={exam.temp} onChange={handleExamChange} className="w-full p-1 border rounded bg-white" placeholder="Temp 98.6" />
+                            <input type="text" name="weight" value={exam.weight} onChange={handleExamChange} className="w-full p-1 border rounded bg-white" placeholder="Weight 65 kg" />
+                            <input type="text" name="spo2" value={exam.spo2} onChange={handleExamChange} className="w-full p-1 border rounded bg-white" placeholder="SpO2 98%" />
+                            <input type="text" name="bmi" value={exam.bmi} onChange={handleExamChange} className="w-full p-1 border rounded bg-white" placeholder="BMI 22.5 kg/m²" />
                         </div>
 
                         <div className="mt-3 relative z-10">
