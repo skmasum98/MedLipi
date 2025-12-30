@@ -117,7 +117,7 @@ const SmartTextarea = ({ label, value, onChange, category, placeholder, height =
     return (
         <div className="relative" ref={wrapperRef}>
             <div className="flex justify-between items-end mb-1">
-                <label className="block text-sm font-semibold text-gray-700">{label}</label>
+                <label htmlFor={category} className="block text-sm font-semibold text-gray-700">{label}</label>
                 {/* Only show Save button if there is text typed in the current segment */}
                 {getLastSegment(value).length > 2 && (
                     <button 
@@ -131,7 +131,9 @@ const SmartTextarea = ({ label, value, onChange, category, placeholder, height =
             </div>
             
             <textarea 
-                className={`w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 ${height}`}
+                id={category}
+                name={category}
+               className={`w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 ${height}`}
                 placeholder={placeholder}
                 value={value} 
                 onChange={(e) => {
