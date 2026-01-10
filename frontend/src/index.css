@@ -34,9 +34,7 @@
 /* Print styles for the appointment schedule */
 @media print {
     /* Hide everything by default */
-    body * {
-        visibility: hidden;
-    }
+    
     
     /* Show only the printable area */
     #printable-schedule, #printable-schedule * {
