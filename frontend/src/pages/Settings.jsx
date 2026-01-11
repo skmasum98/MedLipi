@@ -1,130 +1,324 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { Link } from 'react-router';
 
 const VITE_API_URL = import.meta.env.VITE_API_URL;
 
+// --- Tab Helper ---
+const TabButton = ({ active, label, icon, onClick }) => (
+    <button 
+        type="button"
+        onClick={onClick}
+        className={`flex items-center gap-3 w-full p-4 rounded-xl transition-all duration-200 text-left font-bold ${
+            active 
+            ? 'bg-indigo-600 text-white shadow-lg transform scale-105' 
+            : 'bg-white text-gray-500 hover:bg-indigo-50 hover:text-indigo-600'
+        }`}
+    >
+        <span className="text-xl">{icon}</span>
+        <span>{label}</span>
+    </button>
+);
+
 function Settings() {
     const { token } = useAuth();
-    const [formData, setFormData] = useState({
-        full_name: '', degree: '', bmdc_reg: '',
-        clinic_name: '', chamber_address: '', phone_number: '', specialist_title: ''
-    });
+    const [activeTab, setActiveTab] = useState('clinical'); // 'clinical' or 'website'
     const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState('');
 
-    // Load current profile
+    const [formData, setFormData] = useState({
+        // Clinical / Basic (doctors table)
+        full_name: '', degree: '', bmdc_reg: '',
+        clinic_name: '', chamber_address: '', phone_number: '', 
+        
+        // Website / Rich (doctor_profiles table)
+        slug: '', 
+        specialist_title: '',  // "Cardiologist"
+        designation: '',       // "Associate Professor @ DMC"
+        about_text: '',
+        achievements: '',
+        social_links: { facebook: '', linkedin: '', youtube: '' }, 
+        video_links: [],
+        profile_image: '', 
+        cover_image: ''
+    });
+
+    const [videoInput, setVideoInput] = useState('');
+
+    // --- LOAD DATA ---
     useEffect(() => {
         const fetchProfile = async () => {
             try {
-                const response = await fetch(`${VITE_API_URL}/doctors/profile`, {
+                const response = await fetch(`${VITE_API_URL}/doctors/me/full-profile`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
+                
                 if (response.ok) {
                     const data = await response.json();
-                    // Pre-fill form with null checks
+                    
+                    const socials = typeof data.social_links === 'string' ? JSON.parse(data.social_links) : (data.social_links || {});
+                    const videos = typeof data.video_links === 'string' ? JSON.parse(data.video_links) : (data.video_links || []);
+
                     setFormData({
+                        ...data,
                         full_name: data.full_name || '',
                         degree: data.degree || '',
-                        bmdc_reg: data.bmdc_reg || '', // Read-only
+                        bmdc_reg: data.bmdc_reg || '',
                         clinic_name: data.clinic_name || '',
                         chamber_address: data.chamber_address || '',
                         phone_number: data.phone_number || '',
-                        specialist_title: data.specialist_title || ''
+                        slug: data.slug || '',
+                        
+                        specialist_title: data.specialist_title || '',
+                        designation: data.designation || '',
+                        about_text: data.about_text || '',
+                        achievements: data.achievements || '',
+                        social_links: { 
+                            facebook: socials.facebook || '', 
+                            linkedin: socials.linkedin || '',
+                            youtube: socials.youtube || '' 
+                        },
+                        video_links: videos,
+                        profile_image: data.profile_image || '',
+                        cover_image: data.cover_image || ''
                     });
+                    setVideoInput(videos.join(', '));
                 }
-            } catch (error) {
-                console.error('Error loading profile:', error);
-            } finally {
-                setLoading(false);
-            }
+            } catch (error) { console.error(error); } 
+            finally { setLoading(false); }
         };
         fetchProfile();
     }, [token]);
 
+    // --- HANDLERS ---
     const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+        if(name.startsWith('social_')) {
+             const key = name.split('_')[1];
+             setFormData(prev => ({
+                 ...prev,
+                 social_links: { ...prev.social_links, [key]: value }
+             }));
+        } else {
+             setFormData(prev => ({ ...prev, [name]: value }));
+        }
+    };
+
+    const handleVideoChange = (e) => {
+        setVideoInput(e.target.value);
+        const vArray = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+        setFormData(prev => ({ ...prev, video_links: vArray }));
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setMessage('Saving...');
+        setSaving(true);
+        setMessage('');
+
         try {
-            const response = await fetch(`${VITE_API_URL}/doctors/profile`, {
+            const response = await fetch(`${VITE_API_URL}/doctors/me/full-profile`, {
                 method: 'PUT',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}` 
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(formData),
             });
-
+            const data = await response.json();
+            
             if (response.ok) {
-                setMessage('Settings saved successfully!');
+                setMessage('Success: Profile Updated');
+                setTimeout(() => setMessage(''), 3000);
             } else {
-                setMessage('Failed to save settings.');
+                setMessage(`Error: ${data.message}`);
             }
-        } catch (error) {
-            setMessage('Network error.');
-        }
+        } catch (error) { setMessage('Network error'); }
+        finally { setSaving(false); }
     };
 
-    if (loading) return <div className="p-8 text-center">Loading settings...</div>;
+    if (loading) return <div className="p-20 text-center animate-pulse">Loading Profile Config...</div>;
 
     return (
-        <div className="max-w-4xl mx-auto p-6 my-8 bg-white rounded-xl shadow-lg">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6 pb-2 border-b">Clinic Branding & Settings</h2>
-            
-            <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+            <div className="max-w-7xl mx-auto">
                 
-                {/* Section 1: Personal Info */}
-                <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100">
-                    <h3 className="text-lg font-semibold text-indigo-800 mb-4">Doctor Details</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                            <input type="text" name="full_name" value={formData.full_name} onChange={handleChange} className="w-full p-2 border rounded-md" required />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">BMDC Reg No (Read-only)</label>
-                            <input type="text" value={formData.bmdc_reg} className="w-full p-2 border rounded-md bg-gray-200 text-gray-500" disabled />
-                        </div>
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Degrees</label>
-                            <input type="text" name="degree" value={formData.degree} onChange={handleChange} className="w-full p-2 border rounded-md" placeholder="e.g. MBBS, FCPS (Medicine)" />
-                        </div>
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Specialist Title</label>
-                            <input type="text" name="specialist_title" value={formData.specialist_title} onChange={handleChange} className="w-full p-2 border rounded-md" placeholder="e.g. Medicine Specialist & Diabetologist" />
-                        </div>
+                {/* --- PAGE HEADER --- */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                    <div>
+                        <h1 className="text-3xl font-extrabold text-gray-900">Settings & Profile</h1>
+                        <p className="text-sm text-gray-500 mt-1">Manage your clinic details and public web presence.</p>
                     </div>
+                    {/* Live Preview Button */}
+                    {formData.slug && (
+                        <a href={`/${formData.slug}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-300 text-indigo-600 rounded-xl font-bold shadow-sm hover:shadow-md transition">
+                            <span>🌎</span> View My Website
+                        </a>
+                    )}
                 </div>
 
-                {/* Section 2: Clinic Info (For PDF Header) */}
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Chamber / Clinic Details (For PDF Header)</h3>
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Clinic / Chamber Name</label>
-                            <input type="text" name="clinic_name" value={formData.clinic_name} onChange={handleChange} className="w-full p-2 border rounded-md" placeholder="e.g. City Care Hospital" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Address / Location</label>
-                            <input type="text" name="chamber_address" value={formData.chamber_address} onChange={handleChange} className="w-full p-2 border rounded-md" placeholder="e.g. House 12, Road 5, Dhanmondi, Dhaka" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Appointment / Contact Phone</label>
-                            <input type="text" name="phone_number" value={formData.phone_number} onChange={handleChange} className="w-full p-2 border rounded-md" placeholder="e.g. +880 1711..." />
-                        </div>
+                <div className="flex flex-col lg:flex-row gap-8">
+                    
+                    {/* --- LEFT: TABS SIDEBAR --- */}
+                    <div className="w-full lg:w-64 space-y-4 shrink-0">
+                        <TabButton 
+                            active={activeTab === 'clinical'} 
+                            label="Prescription & Clinic" 
+                            icon="🏥" 
+                            onClick={() => setActiveTab('clinical')} 
+                        />
+                        <TabButton 
+                            active={activeTab === 'website'} 
+                            label="Web Profile & SEO" 
+                            icon="🌐" 
+                            onClick={() => setActiveTab('website')} 
+                        />
                     </div>
-                </div>
 
-                <div className="flex justify-end">
-                    <button type="submit" className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-indigo-700 shadow-md transition-colors">
-                        Save Changes
-                    </button>
+                    {/* --- RIGHT: FORM CONTENT --- */}
+                    <div className="flex-1 bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
+                        <form onSubmit={handleSubmit} className="space-y-8 animate-fade-in">
+                            
+                            {/* === TAB 1: CLINICAL SETTINGS === */}
+                            {activeTab === 'clinical' && (
+                                <div className="space-y-8">
+                                    <div>
+                                        <h3 className="text-xl font-bold text-gray-800 border-b pb-4 mb-6">Identification & Credentials</h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="md:col-span-2">
+                                                <label className="text-xs font-bold text-gray-500 uppercase block mb-2">Legal Full Name</label>
+                                                <input name="full_name" value={formData.full_name} onChange={handleChange} className="w-full p-3 bg-gray-50 border rounded-lg focus:bg-white focus:ring-2 focus:ring-indigo-500 transition outline-none font-bold text-gray-900" placeholder="e.g. Dr. Md. Rahim" />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-500 uppercase block mb-2">BMDC Registration</label>
+                                                <input value={formData.bmdc_reg} disabled className="w-full p-3 bg-gray-100 border border-gray-200 rounded-lg text-gray-400 cursor-not-allowed" />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-500 uppercase block mb-2">Degrees</label>
+                                                <input name="degree" value={formData.degree} onChange={handleChange} className="w-full p-3 bg-gray-50 border rounded-lg" placeholder="MBBS, FCPS, MD..." />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <h3 className="text-xl font-bold text-gray-800 border-b pb-4 mb-6">Prescription Header Info</h3>
+                                        <div className="space-y-6">
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-500 uppercase block mb-2">Clinic / Chamber Name</label>
+                                                <input name="clinic_name" value={formData.clinic_name} onChange={handleChange} className="w-full p-3 bg-gray-50 border rounded-lg" placeholder="e.g. Dhaka Central Hospital" />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-500 uppercase block mb-2">Full Address & Contact</label>
+                                                <textarea name="chamber_address" rows="2" value={formData.chamber_address} onChange={handleChange} className="w-full p-3 bg-gray-50 border rounded-lg" placeholder="Full address displayed on Prescription..." />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-500 uppercase block mb-2">Appointments Number</label>
+                                                <input name="phone_number" value={formData.phone_number} onChange={handleChange} className="w-full p-3 bg-gray-50 border rounded-lg" placeholder="e.g. 01700..." />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* === TAB 2: WEBSITE BUILDER === */}
+                            {activeTab === 'website' && (
+                                <div className="space-y-8">
+                                    <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100">
+                                        <label className="text-xs font-bold text-indigo-700 uppercase block mb-2">Personal Web Link (Slug)</label>
+                                        <div className="flex items-center">
+                                            <span className="bg-white border border-r-0 border-indigo-200 text-gray-500 p-3 rounded-l-lg select-none">
+                                                medlipi.com/
+                                            </span>
+                                            <input name="slug" value={formData.slug} onChange={handleChange} className="flex-1 p-3 border border-indigo-200 rounded-r-lg font-bold text-indigo-900 placeholder:text-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="your-name" />
+                                        </div>
+                                        <p className="text-xs text-indigo-400 mt-2">This is the link you share on social media.</p>
+                                    </div>
+
+                                    <div>
+                                        <h3 className="text-xl font-bold text-gray-800 border-b pb-4 mb-6">Profile Content</h3>
+                                        <div className="space-y-5">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="text-xs font-bold text-gray-500 uppercase block mb-2">Display Title</label>
+                                                    <input name="specialist_title" value={formData.specialist_title} onChange={handleChange} className="w-full p-3 border rounded-lg" placeholder="Cardiologist & Medicine Specialist" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-bold text-gray-500 uppercase block mb-2">Official Designation</label>
+                                                    <input name="designation" value={formData.designation} onChange={handleChange} className="w-full p-3 border rounded-lg" placeholder="Associate Professor, Dept. of Medicine" />
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-500 uppercase block mb-2">Biography / About</label>
+                                                <textarea name="about_text" rows="5" value={formData.about_text} onChange={handleChange} className="w-full p-3 border rounded-lg text-sm leading-relaxed" placeholder="Write a short professional bio..." />
+                                            </div>
+                                            
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-500 uppercase block mb-2">Key Achievements</label>
+                                                <textarea name="achievements" rows="3" value={formData.achievements} onChange={handleChange} className="w-full p-3 border rounded-lg text-sm" placeholder="Gold Medalist, 10 Years Experience (Comma separated or new lines)" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <h3 className="text-xl font-bold text-gray-800 border-b pb-4 mb-6">Media & Social</h3>
+                                        <div className="space-y-4">
+                                             <div>
+                                                 <label className="text-xs font-bold text-gray-500 uppercase block mb-2">YouTube Video Gallery (IDs)</label>
+                                                 <input value={videoInput} onChange={handleVideoChange} className="w-full p-3 border rounded-lg font-mono text-xs text-red-600 bg-gray-50" placeholder="Paste YouTube Video IDs like: dQw4w9WgXcQ, abc12345" />
+                                             </div>
+                                             
+                                             <div className="grid grid-cols-2 gap-4">
+                                                 <input name="social_facebook" value={formData.social_links.facebook} onChange={handleChange} className="w-full p-3 border rounded-lg text-xs" placeholder="Facebook Profile Link" />
+                                                 <input name="social_linkedin" value={formData.social_links.linkedin} onChange={handleChange} className="w-full p-3 border rounded-lg text-xs" placeholder="LinkedIn Profile Link" />
+                                             </div>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white border border-dashed border-gray-300 rounded-xl p-6">
+                                        
+                                        {/* Profile Picture */}
+                                        <div className="flex flex-col items-center text-center">
+                                            <div className="w-24 h-24 rounded-full bg-gray-100 overflow-hidden mb-3 border-4 border-white shadow-md relative">
+                                                {formData.profile_image ? (
+                                                    <img src={formData.profile_image} alt="Preview" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <span className="text-3xl flex h-full w-full items-center justify-center text-gray-300">👤</span>
+                                                )}
+                                            </div>
+                                            <label className="text-xs font-bold text-gray-500 uppercase mb-2">Profile Photo (Link)</label>
+                                            <input name="profile_image" value={formData.profile_image} onChange={handleChange} className="w-full p-2 border rounded text-xs text-gray-600" placeholder="https://example.com/me.jpg" />
+                                        </div>
+
+                                        {/* Cover Image */}
+                                        <div className="flex flex-col">
+                                            <div className="h-24 rounded-lg bg-gray-100 overflow-hidden mb-3 relative shadow-inner">
+                                                {formData.cover_image ? (
+                                                    <img src={formData.cover_image} alt="Preview" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="h-full flex items-center justify-center text-gray-300 text-xs">No Cover Image</div>
+                                                )}
+                                            </div>
+                                            <label className="text-xs font-bold text-gray-500 uppercase mb-2">Banner / Cover Photo (Link)</label>
+                                            <input name="cover_image" value={formData.cover_image} onChange={handleChange} className="w-full p-2 border rounded text-xs text-gray-600" placeholder="https://example.com/banner.jpg" />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* --- ACTION BAR --- */}
+                            <div className="flex justify-between items-center pt-8 border-t border-gray-100">
+                                <div className="text-sm font-bold text-green-600 animate-pulse">{message}</div>
+                                <button 
+                                    type="submit" 
+                                    disabled={saving}
+                                    className={`px-8 py-3 rounded-xl font-bold text-white shadow-lg transform transition active:scale-95 flex items-center gap-2 ${saving ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                                >
+                                    {saving ? 'Saving...' : 'Save Changes'}
+                                </button>
+                            </div>
+
+                        </form>
+                    </div>
+
                 </div>
-                {message && <p className={`text-center mt-4 font-medium ${message.includes('success') ? 'text-green-600' : 'text-red-600'}`}>{message}</p>}
-            </form>
+            </div>
         </div>
     );
 }

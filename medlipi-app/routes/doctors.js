@@ -59,4 +59,132 @@ router.put('/profile', async (req, res) => {
     }
 });
 
+// --- GET My Rich Profile ---
+router.get('/me/full-profile', async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                d.*,
+                dp.about_text,
+                dp.designation,
+                dp.achievements,
+                dp.social_links,
+                dp.gallery_images,
+                dp.video_links,
+                dp.profile_image,
+                dp.cover_image
+            FROM doctors d
+            LEFT JOIN doctor_profiles dp 
+                ON d.doctor_id = dp.doctor_id
+            WHERE d.doctor_id = ?
+        `;
+
+        const [rows] = await pool.query(query, [req.user.id]);
+
+        if (!rows.length) {
+            return res.status(404).json({ message: 'Doctor not found' });
+        }
+
+        const profile = rows[0];
+
+        // Parse JSON fields safely
+        profile.social_links = profile.social_links ? JSON.parse(profile.social_links) : {};
+        profile.gallery_images = profile.gallery_images ? JSON.parse(profile.gallery_images) : [];
+        profile.video_links = profile.video_links ? JSON.parse(profile.video_links) : [];
+        profile.profile_image = profile.profile_image;
+        profile.cover_image = profile.cover_image;
+
+        res.json(profile);
+    } catch (e) {
+        console.error(e);
+        res.status(500).send('Error fetching profile');
+    }
+});
+
+
+// --- PUT Update Rich Profile (Settings Page) ---
+router.put('/me/full-profile', async (req, res) => {
+    const doctorId = req.user.id;
+
+    const { 
+        slug, full_name, degree, specialist_title, clinic_name, 
+        chamber_address, phone_number,
+        about_text, designation, achievements,
+        social_links, gallery_images, video_links,
+        profile_image, cover_image
+    } = req.body;
+
+    let connection;
+    try {
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
+
+        // 1. Update basic doctor info
+        await connection.query(
+            `UPDATE doctors 
+             SET full_name=?, degree=?, specialist_title=?, clinic_name=?, 
+                 chamber_address=?, phone_number=?, slug=? 
+             WHERE doctor_id=?`,
+            [
+                full_name,
+                degree,
+                specialist_title,
+                clinic_name,
+                chamber_address,
+                phone_number,
+                slug,
+                doctorId
+            ]
+        );
+
+        // 2. Upsert rich profile
+        await connection.query(
+            `INSERT INTO doctor_profiles 
+                (doctor_id, about_text, designation, achievements, social_links, gallery_images, video_links, profile_image, cover_image)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+                about_text     = VALUES(about_text),
+                designation    = VALUES(designation),
+                achievements   = VALUES(achievements),
+                social_links   = VALUES(social_links),
+                gallery_images = VALUES(gallery_images),
+                video_links    = VALUES(video_links),
+                profile_image  = VALUES(profile_image),
+                cover_image    = VALUES(cover_image)
+            `,
+            [
+                doctorId,
+                about_text,
+                designation,
+                achievements,
+                JSON.stringify(social_links || {}),
+                JSON.stringify(gallery_images || []),
+                JSON.stringify(video_links || []),
+                profile_image, 
+                cover_image
+            ]
+        );
+
+        await connection.commit();
+        res.json({ message: 'Profile Saved!' });
+
+    } catch (e) {
+        if (connection) await connection.rollback();
+
+        if (e.code === 'ER_DUP_ENTRY') {
+            return res.status(400).json({
+                message: 'URL/Slug is already taken. Choose another.'
+            });
+        }
+
+        console.error(e);
+        res.status(500).send('Save failed');
+    } finally {
+        if (connection) connection.release();
+    }
+});
+
+
+
+
 export default router;

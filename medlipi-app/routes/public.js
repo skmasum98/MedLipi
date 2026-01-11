@@ -283,4 +283,52 @@ router.get('/prescription/:uid', async (req, res) => {
     }
 });
 
+// --- GET Single Doctor Profile ---
+router.get('/doctors/:id', async (req, res) => {
+    try {
+        const query = `
+            SELECT doctor_id, full_name, degree, specialist_title, 
+                   clinic_name, chamber_address, phone_number 
+            FROM doctors 
+            WHERE doctor_id = ?
+        `;
+        const [rows] = await pool.query(query, [req.params.id]);
+        
+        if (rows.length === 0) return res.status(404).json({ message: 'Doctor not found' });
+        
+        res.json(rows[0]);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// --- GET Public Profile by SLUG ---
+router.get('/profile/:slug', async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                d.doctor_id, d.full_name, d.degree, d.specialist_title, 
+                d.clinic_name, d.chamber_address, d.phone_number, d.slug,
+                dp.about_text, dp.designation, dp.social_links, 
+                dp.achievements,
+                dp.gallery_images, dp.video_links, dp.additional_chambers, dp.profile_image, dp.cover_image
+            FROM doctors d
+            LEFT JOIN doctor_profiles dp ON d.doctor_id = dp.doctor_id
+            WHERE d.slug = ?
+        `;
+        const [rows] = await pool.query(query, [req.params.slug]);
+
+        if (rows.length === 0) return res.status(404).json({ message: 'Doctor not found' });
+        res.json(rows[0]);
+    } catch (e) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Update the Schedules route to work with doctor_id (We already did this, just ensuring logic)
+// Frontend will use the ID fetched from the slug to call the schedule API.
+
+
+
 export default router;

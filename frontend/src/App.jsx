@@ -44,6 +44,7 @@ import GlobalReceptionLayout from './layouts/GlobalReceptionLayout';
 import GlobalStaffLogin from './pages/global_reception/GlobalStaffLogin';
 import GlobalSessionManager from './pages/global_reception/GlobalSessionManager';
 import GlobalWalkIn from './pages/global_reception/GlobalWalkIn';
+import DoctorProfile from './pages/public/DoctorProfile';
 
 
 function App() {
@@ -64,7 +65,7 @@ function App() {
                         <Route path="/patient/register" element={<PatientRegister />} />
                         <Route path="/my-health" element={<PatientDashboard />} />
                     </Route>
-
+                    <Route path="/:slug" element={<DoctorProfile />} />
                     {/* === 2. DOCTOR ROUTES (Blue Header) === */}
                     <Route element={<ProtectedRoute allowedRoles={['doctor']}><DoctorLayout /></ProtectedRoute>}>
                         <Route path="/dashboard" element={<DashboardDoctor />} />

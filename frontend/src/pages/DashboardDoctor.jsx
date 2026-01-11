@@ -114,12 +114,16 @@ function DashboardDoctor() {
                              Dr. {doctor?.full_name}
                         </h1>
                     </div>
-                    <Link 
-                        to="/prescription/new" 
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl shadow-lg hover:shadow-indigo-500/30 transition-all font-bold flex items-center gap-2 transform active:scale-95"
-                    >
-                        <span>➕</span> New Prescription
-                    </Link>
+                    
+                    {/* Share Button Group */}
+                    <div className="flex gap-2">
+                        <Link 
+                            to="/prescription/new" 
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl shadow-lg transition font-bold flex items-center gap-2"
+                        >
+                            <span>+</span> New Prescription
+                        </Link>
+                    </div>
                 </div>
 
                 {/* --- KPI STATS --- */}
