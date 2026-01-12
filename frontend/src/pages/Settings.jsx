@@ -20,6 +20,18 @@ const TabButton = ({ active, label, icon, onClick }) => (
     </button>
 );
 
+const extractYouTubeId = (url) => {
+    if (!url) return null;
+
+    const regex =
+        /(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+
+    const match = url.match(regex);
+    return match ? match[1] : url.length === 11 ? url : null;
+};
+
+
+
 function Settings() {
     const { token } = useAuth();
     const [activeTab, setActiveTab] = useState('clinical'); // 'clinical' or 'website'
@@ -40,11 +52,36 @@ function Settings() {
         achievements: '',
         social_links: { facebook: '', linkedin: '', youtube: '' }, 
         video_links: [],
+        gallery_images: [],
         profile_image: '', 
         cover_image: ''
     });
 
     const [videoInput, setVideoInput] = useState('');
+
+        const addVideo = () => {
+            const id = extractYouTubeId(videoInput.trim());
+            if (!id) return;
+
+            setFormData(prev => ({
+                ...prev,
+                video_links: prev.video_links.includes(id)
+                    ? prev.video_links
+                    : [...prev.video_links, id]
+            }));
+
+            setVideoInput('');
+        };
+
+        const removeVideo = (idx) => {
+            setFormData(prev => ({
+                ...prev,
+                video_links: prev.video_links.filter((_, i) => i !== idx)
+            }));
+        };
+
+    
+    const [galleryInput, setGalleryInput] = useState('');
 
     // --- LOAD DATA ---
     useEffect(() => {
@@ -59,6 +96,9 @@ function Settings() {
                     
                     const socials = typeof data.social_links === 'string' ? JSON.parse(data.social_links) : (data.social_links || {});
                     const videos = typeof data.video_links === 'string' ? JSON.parse(data.video_links) : (data.video_links || []);
+                    const gallery = typeof data.gallery_images === 'string'
+                        ? JSON.parse(data.gallery_images)
+                        : (Array.isArray(data.gallery_images) ? data.gallery_images : []);
 
                     setFormData({
                         ...data,
@@ -80,6 +120,7 @@ function Settings() {
                             youtube: socials.youtube || '' 
                         },
                         video_links: videos,
+                        gallery_images: gallery, 
                         profile_image: data.profile_image || '',
                         cover_image: data.cover_image || ''
                     });
@@ -110,6 +151,24 @@ function Settings() {
         const vArray = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
         setFormData(prev => ({ ...prev, video_links: vArray }));
     };
+
+    const addGalleryImage = () => {
+        if (!galleryInput.trim()) return;
+
+        setFormData(prev => ({
+            ...prev,
+            gallery_images: [...prev.gallery_images, galleryInput.trim()]
+        }));
+        setGalleryInput('');
+    };
+
+    const removeGalleryImage = (index) => {
+        setFormData(prev => ({
+            ...prev,
+            gallery_images: prev.gallery_images.filter((_, i) => i !== index)
+        }));
+    };
+
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -259,10 +318,117 @@ function Settings() {
 
                                     <div>
                                         <h3 className="text-xl font-bold text-gray-800 border-b pb-4 mb-6">Media & Social</h3>
+                                        <div className="bg-white border border-dashed border-gray-300 rounded-xl p-6">
+    <h3 className="text-xl font-bold text-gray-800 border-b pb-4 mb-6">
+        Photo Gallery
+    </h3>
+
+    {/* Input */}
+    <div className="flex gap-3 mb-4">
+        <input
+            value={galleryInput}
+            onChange={(e) => setGalleryInput(e.target.value)}
+            placeholder="Paste image URL & click Add"
+            className="flex-1 p-3 border rounded-lg text-sm"
+        />
+        <button
+            type="button"
+            onClick={addGalleryImage}
+            className="px-5 py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700"
+        >
+            Add
+        </button>
+    </div>
+
+    {/* Gallery Preview */}
+    {formData.gallery_images.length > 0 ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            {Array.isArray(formData.gallery_images) &&
+                formData.gallery_images.map((img, idx) => (
+                <div key={idx} className="relative group rounded-xl overflow-hidden shadow border">
+                    <img
+                        src={img}
+                        alt=""
+                        className="w-full h-32 object-cover group-hover:scale-105 transition"
+                    />
+                    <button
+                        type="button"
+                        onClick={() => removeGalleryImage(idx)}
+                        className="absolute top-2 right-2 bg-red-600 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100"
+                    >
+                        ✕
+                    </button>
+                </div>
+            ))}
+        </div>
+    ) : (
+        <p className="text-sm text-gray-400 italic">No gallery images added yet</p>
+    )}
+</div>
                                         <div className="space-y-4">
                                              <div>
-                                                 <label className="text-xs font-bold text-gray-500 uppercase block mb-2">YouTube Video Gallery (IDs)</label>
-                                                 <input value={videoInput} onChange={handleVideoChange} className="w-full p-3 border rounded-lg font-mono text-xs text-red-600 bg-gray-50" placeholder="Paste YouTube Video IDs like: dQw4w9WgXcQ, abc12345" />
+                                                 <div className="bg-white border border-dashed border-gray-300 rounded-xl p-6">
+    <h3 className="text-xl font-bold text-gray-800 border-b pb-4 mb-6">
+        🎬 YouTube Videos
+    </h3>
+
+    {/* Input */}
+    <div className="flex gap-3 mb-6">
+        <input
+            value={videoInput}
+            onChange={(e) => setVideoInput(e.target.value)}
+            placeholder="Paste YouTube link or video ID"
+            className="flex-1 p-3 border rounded-lg text-sm"
+        />
+        <button
+            type="button"
+            onClick={addVideo}
+            className="px-5 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700"
+        >
+            Add
+        </button>
+    </div>
+
+    {/* Video Grid */}
+    {formData.video_links.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {formData.video_links.map((vid, idx) => (
+                <div
+                    key={idx}
+                    className="relative group rounded-xl overflow-hidden border shadow bg-black"
+                >
+                    <img
+                        src={`https://img.youtube.com/vi/${vid}/hqdefault.jpg`}
+                        alt="Video thumbnail"
+                        className="w-full h-40 object-cover"
+                    />
+
+                    {/* Play Icon */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="bg-red-600 text-white rounded-full w-14 h-14 flex items-center justify-center text-xl shadow-lg opacity-90">
+                            ▶
+                        </div>
+                    </div>
+
+                    {/* Remove */}
+                    <button
+                        type="button"
+                        onClick={() => removeVideo(idx)}
+                        className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100"
+                    >
+                        ✕
+                    </button>
+                </div>
+            ))}
+        </div>
+    ) : (
+        <p className="text-sm text-gray-400 italic">
+            No videos added yet
+        </p>
+    )}
+</div>
+
+                                                 
                                              </div>
                                              
                                              <div className="grid grid-cols-2 gap-4">
@@ -299,6 +465,7 @@ function Settings() {
                                             <input name="cover_image" value={formData.cover_image} onChange={handleChange} className="w-full p-2 border rounded text-xs text-gray-600" placeholder="https://example.com/banner.jpg" />
                                         </div>
                                     </div>
+                                    
                                 </div>
                             )}
 

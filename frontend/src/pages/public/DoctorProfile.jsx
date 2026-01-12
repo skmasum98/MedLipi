@@ -17,6 +17,9 @@ function DoctorProfile() {
     
     const [socials, setSocials] = useState({});
     const [videos, setVideos] = useState([]);
+    const [gallery, setGallery] = useState([]);
+    const [activeVideo, setActiveVideo] = useState(null);
+
     
     // --- FETCH DATA ---
     useEffect(() => {
@@ -33,6 +36,12 @@ function DoctorProfile() {
                 try {
                     setSocials(typeof data.social_links === 'string' ? JSON.parse(data.social_links) : data.social_links || {});
                     setVideos(typeof data.video_links === 'string' ? JSON.parse(data.video_links) : data.video_links || []);
+                    setGallery(typeof data.gallery_images === 'string'
+        ? JSON.parse(data.gallery_images)
+        : Array.isArray(data.gallery_images)
+            ? data.gallery_images
+            : []
+    );
                 } catch(e) { console.error("Parse Error", e); }
 
                 // 2. Fetch Schedule (Using Doctor ID)
@@ -52,7 +61,7 @@ function DoctorProfile() {
         // Patient Auth Check logic needed here or redirect
         const token = localStorage.getItem('patientToken'); 
         if (!token) {
-            localStorage.setItem('redirectAfterLogin', `/meet/${slug}`); // Return here after login
+            localStorage.setItem('redirectAfterLogin', `/${slug}`); // Return here after login
             if(confirm("You must login to book. Proceed to Login?")) {
                 navigate('/patient/login');
             }
@@ -200,26 +209,86 @@ function DoctorProfile() {
                             </section>
                         )}
 
-                        {/* Videos Gallery */}
-                        {videos.length > 0 && (
+                        {/* Photo Gallery */}
+                        {gallery.length > 0 && (
                             <section>
                                 <h3 className="text-xl font-bold text-slate-800 border-b border-slate-200 pb-3 mb-6 flex items-center gap-2">
-                                    <span className="bg-red-100 text-red-700 w-8 h-8 flex items-center justify-center rounded-lg text-sm">▶</span> 
-                                    Featured Media
+                                    <span className="bg-indigo-100 text-indigo-700 w-8 h-8 flex items-center justify-center rounded-lg text-sm">
+                                        🖼
+                                    </span>
+                                    Photo Gallery
                                 </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {videos.map(id => (
-                                        <div key={id} className="group relative rounded-xl overflow-hidden shadow-lg aspect-video bg-black">
-                                            <iframe 
-                                                className="w-full h-full"
-                                                src={`https://www.youtube.com/embed/${id}`} 
-                                                title="Video" frameBorder="0" allowFullScreen
-                                            ></iframe>
+
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                    {gallery.map((img, idx) => (
+                                        <div
+                                            key={idx}
+                                            className="group relative overflow-hidden rounded-xl border border-slate-200 shadow-sm bg-white"
+                                        >
+                                            <img
+                                                src={img}
+                                                alt={`Gallery ${idx + 1}`}
+                                                className="w-full h-40 object-cover transition-transform duration-300 group-hover:scale-105"
+                                                loading="lazy"
+                                            />
                                         </div>
                                     ))}
                                 </div>
                             </section>
                         )}
+
+
+                        {/* Videos Gallery */}
+  
+                        {videos.length > 0 && (
+    <section>
+        <h3 className="text-xl font-bold text-slate-800 border-b border-slate-200 pb-3 mb-6 flex items-center gap-2">
+            <span className="bg-red-100 text-red-700 w-8 h-8 flex items-center justify-center rounded-lg text-sm">
+                ▶
+            </span>
+            Featured Media
+        </h3>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {videos.map((id, idx) => (
+                <div
+                    key={idx}
+                    className="relative rounded-xl overflow-hidden shadow-lg aspect-video bg-black"
+                >
+                    {activeVideo === id ? (
+                        <iframe
+                            className="w-full h-full"
+                            src={`https://www.youtube.com/embed/${id}?autoplay=1`}
+                            title="YouTube video"
+                            frameBorder="0"
+                            allow="autoplay; encrypted-media"
+                            allowFullScreen
+                        />
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => setActiveVideo(id)}
+                            className="group w-full h-full"
+                        >
+                            <img
+                                src={`https://img.youtube.com/vi/${id}/hqdefault.jpg`}
+                                alt="Video thumbnail"
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                            />
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                <div className="w-16 h-16 rounded-full bg-red-600 text-white flex items-center justify-center text-2xl shadow-xl group-hover:scale-110 transition">
+                                    ▶
+                                </div>
+                            </div>
+                        </button>
+                    )}
+                </div>
+            ))}
+        </div>
+    </section>
+)}
+
                     </div>
 
                     {/* RIGHT COLUMN (4 cols) - SIDEBAR (Booking) */}
