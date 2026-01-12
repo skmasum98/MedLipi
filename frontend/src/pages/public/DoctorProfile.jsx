@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { Helmet } from 'react-helmet-async';
+
 import { useAuth } from '../../hooks/useAuth';
 
 
@@ -102,10 +102,7 @@ function DoctorProfile() {
     return (
         <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
             {/* SEO Metadata */}
-            <Helmet>
-                <title>Dr. {doctor.full_name} | Book Appointment</title>
-                <meta name="description" content={`Consult ${doctor.specialist_title} ${doctor.full_name}. Clinic: ${doctor.clinic_name}. Book online.`} />
-            </Helmet>
+            
 
             {/* === 1. HERO BANNER === */}
             <div className="relative bg-slate-900 text-white pb-20 pt-32 lg:pt-40">
