@@ -28,14 +28,21 @@ function PatientRegister() {
             const data = await res.json();
 
             if (res.ok) {
-                // Success! Store token
                 localStorage.setItem('patientToken', data.token);
                 localStorage.setItem('patientName', data.patient.name);
-                
-                // Alert the user their ID (Crucial step!)
-                alert(`Registration Successful!\n\nIMPORTANT: Your Patient ID is: ${data.patient.id}\n\nPlease save this ID to login in the future.`);
-                
-                navigate('/my-health');
+
+                alert(
+                    `Registration Successful!\n\nIMPORTANT: Your Patient ID is: ${data.patient.id}\n\nPlease save this ID to login in the future.`
+                );
+
+                const redirect = localStorage.getItem('redirectAfterLogin');
+
+                if (redirect) {
+                    localStorage.removeItem('redirectAfterLogin');
+                    navigate(redirect);
+                } else {
+                    navigate('/my-health');
+                }
             } else {
                 setError(data.message);
             }

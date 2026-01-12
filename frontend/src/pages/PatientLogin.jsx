@@ -21,10 +21,18 @@ function PatientLogin() {
             const data = await res.json();
             
             if (res.ok) {
-                // Store in a different key than the doctor's token
                 localStorage.setItem('patientToken', data.token);
                 localStorage.setItem('patientName', data.patient.name);
-                navigate('/my-health');
+
+                // 🔁 Redirect logic
+                const redirect = localStorage.getItem('redirectAfterLogin');
+
+                if (redirect) {
+                    localStorage.removeItem('redirectAfterLogin');
+                    navigate(redirect);
+                } else {
+                    navigate('/my-health');
+                }
             } else {
                 setError(data.message);
             }
