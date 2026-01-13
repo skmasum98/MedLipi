@@ -194,7 +194,7 @@ function DashboardDoctor() {
 
                                                         {/* PRINT BUTTON */}
                                                         <button 
-                                                            onClick={() => handleReprint(visit.patient_id, visit.visit_date, visitKey)}
+                                                            onClick={() => handleReprint(visit.patient_id, new Date(visit.visit_date).toISOString(), visitKey)}
                                                             disabled={!!processingId}
                                                             className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition disabled:opacity-50"
                                                         >
