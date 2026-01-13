@@ -400,7 +400,7 @@ function PatientRecord() {
                                                     {/* Action Buttons */}
                                                     <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-100">
                                                         <button
-                                                            onClick={() => handleReprint(patient.patient_id, visit.raw_date, visit.date)}
+                                                            onClick={() => handleReprint(patient.patient_id, new Date(visit.visit_date).toISOString(), visit.date)}
                                                             disabled={reprintLoading === visit.date}
                                                             className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                         >
