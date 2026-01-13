@@ -78,58 +78,38 @@ function PatientRecord() {
     };
 
     // Handle reprint with loading state
-    // const handleReprint = async (patientId, rawDate, visitDate) => {
-    //     setReprintLoading(visitDate);
-    //     try {
-    //         const res = await fetch(`${VITE_API_URL}/prescriptions/reprint/${patientId}`, {
-    //             method: 'POST',
-    //             headers: { 
-    //                 'Content-Type': 'application/json', 
-    //                 'Authorization': `Bearer ${token}` 
-    //             },
-    //             body: JSON.stringify({ date: rawDate }) 
-    //         });
-            
-    //         if (res.ok) {
-    //             const blob = await res.blob();
-    //             const url = window.URL.createObjectURL(blob);
-    //             const a = document.createElement('a');
-    //             a.href = url;
-    //             a.download = `Prescription_${patientId}_${new Date(rawDate).toISOString().split('T')[0]}.pdf`;
-    //             document.body.appendChild(a);
-    //             a.click();
-    //             document.body.removeChild(a);
-    //             window.URL.revokeObjectURL(url);
-    //         } else {
-    //             const errorData = await res.json();
-    //             alert(`Reprint failed: ${errorData.message || 'Prescription might be too old or formatted differently.'}`);
-    //         }
-    //     } catch (e) { 
-    //         console.error('Reprint error:', e);
-    //         alert('Failed to generate reprint. Please try again.');
-    //     } finally {
-    //         setReprintLoading(null);
-    //     }
-    // };
-
-    const handleReprint = async (patientId, date, uiKey) => {
-        setProcessingId(`print-${uiKey}`);
+    const handleReprint = async (patientId, rawDate, visitDate) => {
+        setReprintLoading(visitDate);
         try {
             const res = await fetch(`${VITE_API_URL}/prescriptions/reprint/${patientId}`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ date }) 
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify({ date: rawDate }) 
             });
+            
             if (res.ok) {
                 const blob = await res.blob();
                 const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a'); a.href = url; a.download = 'Prescription_Copy.pdf'; 
-                document.body.appendChild(a); a.click(); window.URL.revokeObjectURL(url);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Prescription_${patientId}_${new Date(rawDate).toISOString().split('T')[0]}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
             } else {
-                alert('Reprint failed. Prescription not found.');
+                const errorData = await res.json();
+                alert(`Reprint failed: ${errorData.message || 'Prescription might be too old or formatted differently.'}`);
             }
-        } catch (e) { console.error(e); }
-        finally { setProcessingId(null); }
+        } catch (e) { 
+            console.error('Reprint error:', e);
+            alert('Failed to generate reprint. Please try again.');
+        } finally {
+            setReprintLoading(null);
+        }
     };
 
     // Handle edit navigation
@@ -420,7 +400,12 @@ function PatientRecord() {
                                                     {/* Action Buttons */}
                                                     <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-100">
                                                         <button
-                                                            onClick={() => handleReprint(visit.patient_id, new Date(visit.visit_date).toISOString(), visitKey)}
+                                                            onClick={() =>
+                                                                handleReprint(
+                                                                    patient.patient_id,
+                                                                    new Date(visit.raw_date).toISOString(), // ✅ FIX
+                                                                    visit.raw_date
+                                                                )}
                                                             disabled={reprintLoading === visit.date}
                                                             className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                         >
